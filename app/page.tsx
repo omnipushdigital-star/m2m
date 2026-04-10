@@ -20,7 +20,7 @@ async function AbfChartData() {
     monthTotals.set(r.month, (monthTotals.get(r.month) ?? 0) + (r.abf_amount ?? 0))
   }
 
-  const chartData = [...monthTotals.entries()]
+  const chartData = Array.from(monthTotals.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([month, abf]) => ({ month, abf }))
 

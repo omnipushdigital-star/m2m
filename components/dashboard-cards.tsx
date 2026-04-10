@@ -17,7 +17,7 @@ export async function DashboardCards() {
       latestPerCustomer.set(r.customer_id, { active_sims: r.active_sims ?? 0, commissioning_pending: r.commissioning_pending ?? 0 })
     }
   }
-  const totalActiveSims = [...latestPerCustomer.values()].reduce((s, r) => s + r.active_sims, 0)
+  const totalActiveSims = Array.from(latestPerCustomer.values()).reduce((s, r) => s + r.active_sims, 0)
 
   const totalAbfThisMonth = (currentMonthRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
   const totalPending = (currentMonthRecords ?? []).reduce((s, r) => s + (r.commissioning_pending ?? 0), 0)

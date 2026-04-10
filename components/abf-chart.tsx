@@ -1,6 +1,7 @@
 'use client'
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import type { ValueType } from 'recharts/types/component/DefaultTooltipContent'
 
 export function AbfChart({ data }: { data: { month: string; abf: number }[] }) {
   return (
@@ -10,7 +11,7 @@ export function AbfChart({ data }: { data: { month: string; abf: number }[] }) {
           <CartesianGrid strokeDasharray="3 3" vertical={false} />
           <XAxis dataKey="month" tick={{ fontSize: 12 }} />
           <YAxis tick={{ fontSize: 12 }} tickFormatter={(v: number) => `₹${v.toFixed(1)}Cr`} />
-          <Tooltip formatter={(v: number) => [`₹${v.toFixed(3)} Cr`, 'ABF']} />
+          <Tooltip formatter={(v: ValueType | undefined) => [`₹${(Number(v ?? 0)).toFixed(3)} Cr`, 'ABF']} />
           <Bar dataKey="abf" fill="#3b82f6" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>

@@ -15,7 +15,7 @@ export async function TopCustomersTable() {
     }
   }
 
-  const topIds = [...latestPerCustomer.entries()]
+  const topIds = Array.from(latestPerCustomer.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([id]) => id)
