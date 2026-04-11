@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Nav } from '@/components/nav'
+import { HeaderUser } from '@/components/header-user'
+import { getSession, getRole } from '@/lib/supabase-server'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -10,12 +12,15 @@ export const metadata: Metadata = {
   description: 'M2M SIM inventory and billing management',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getSession()
+  const role    = await getRole()
+
   return (
     <html lang="en">
       <body className={cn(inter.className, 'flex min-h-screen bg-[#f8f9fc]')}>
 
-        {/* ── Orange sidebar ── */}
+        {/* ── Sidebar ── */}
         <Nav />
 
         {/* ── Right panel ── */}
@@ -30,26 +35,36 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="text-white font-extrabold text-base tracking-wide leading-tight">
                 EB PLATINUM UNIT GURGAON
               </span>
-              <span
-                className="text-sm font-semibold tracking-widest mt-0.5"
-                style={{ color: '#43a047' }}
-              >
+              <span className="text-sm font-semibold tracking-widest mt-0.5" style={{ color: '#43a047' }}>
                 CNTx- N
               </span>
             </div>
 
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-4">
               <span
                 className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white"
                 style={{ background: '#f57c00' }}
               >
                 M2M / IoT SIM Inventory
               </span>
+
+              {session && (
+                <HeaderUser
+                  email={session.user.email ?? ''}
+                  role={role ?? 'viewer'}
+                />
+              )}
             </div>
           </header>
 
           {/* ── Page content ── */}
           <main className="flex-1 px-6 py-6">{children}</main>
+
+          {/* ── Footer ── */}
+          <footer className="px-6 py-3 text-center text-xs text-slate-400 border-t border-slate-200">
+            Developed by <span className="font-semibold text-slate-500">Naveen Saini</span>
+            {' · '}NAM EB Platinum Unit Gurgaon
+          </footer>
         </div>
 
       </body>
@@ -57,7 +72,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   )
 }
 
-// tiny helper so we don't need to import cn from lib
 function cn(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ')
 }

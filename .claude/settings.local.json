@@ -47,7 +47,9 @@
       "Bash(node scripts/seed-funnel.js)",
       "Bash(find /d/MAC/Desktop -iname *bsnl*logo* -o -iname *logo*bsnl*)",
       "Bash(head -10 find '/c/Users/Naveen Saini' -maxdepth 3 -iname *bsnl*logo*)",
-      "Bash(ls \"D:\\\\Claude Projects\\\\M2M INVENTORY\\\\public\"\" 2>/dev/null || echo \"no public dir\" && ls \"D:/Claude Projects/M2M INVENTORY/ \")"
+      "Bash(ls \"D:\\\\Claude Projects\\\\M2M INVENTORY\\\\public\"\" 2>/dev/null || echo \"no public dir\" && ls \"D:/Claude Projects/M2M INVENTORY/ \")",
+      "Bash(vercel ls:*)",
+      "Bash(node scripts/update-apr26.js)"
     ]
   }
 }
