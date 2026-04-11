@@ -30,48 +30,6 @@ async function AbfChartData() {
 export default function DashboardPage() {
   return (
     <div className="space-y-8">
-      {/* ── BSNL Hero Banner ── */}
-      <div
-        className="-mx-4 -mt-6 px-4 py-8 mb-2"
-        style={{
-          background: 'linear-gradient(135deg, #0d1457 0%, #1a237e 55%, #283593 100%)',
-          borderBottom: '4px solid #f57c00',
-        }}
-      >
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          {/* Left — unit identity */}
-          <div>
-            <p
-              className="text-xs font-semibold uppercase tracking-[0.18em] mb-1"
-              style={{ color: '#f57c00' }}
-            >
-              Bharat Sanchar Nigam Limited
-            </p>
-            <h1
-              className="text-2xl md:text-3xl font-extrabold text-white tracking-wide leading-tight"
-            >
-              EB PLATINUM UNIT GURGAON
-            </h1>
-            <p
-              className="text-base font-semibold mt-0.5 tracking-widest"
-              style={{ color: '#43a047' }}
-            >
-              CNTx- N
-            </p>
-          </div>
-
-          {/* Right — module label */}
-          <div className="text-right">
-            <span
-              className="inline-block px-4 py-1.5 rounded-full text-sm font-bold text-white"
-              style={{ background: '#f57c00' }}
-            >
-              M2M / IoT SIM Inventory
-            </span>
-            <p className="text-white/50 text-xs mt-1">Billing &amp; Activation Tracker</p>
-          </div>
-        </div>
-      </div>
 
       {/* ── KPI Cards ── */}
       <Suspense
@@ -88,13 +46,8 @@ export default function DashboardPage() {
 
       {/* ── ABF Chart ── */}
       <div>
-        <h2
-          className="text-lg font-semibold mb-3 flex items-center gap-2"
-        >
-          <span
-            className="inline-block w-1 h-5 rounded"
-            style={{ background: '#f57c00' }}
-          />
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span className="inline-block w-1 h-5 rounded" style={{ background: '#f57c00' }} />
           ABF Trend — Last 6 Months (₹ Cr)
         </h2>
         <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
@@ -105,16 +58,14 @@ export default function DashboardPage() {
       {/* ── Top Customers ── */}
       <div>
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span
-            className="inline-block w-1 h-5 rounded"
-            style={{ background: '#2e7d32' }}
-          />
+          <span className="inline-block w-1 h-5 rounded" style={{ background: '#2e7d32' }} />
           Top 10 Customers by Active SIMs
         </h2>
         <Suspense fallback={<div className="h-48 rounded-lg bg-slate-100 animate-pulse" />}>
           <TopCustomersTable />
         </Suspense>
       </div>
+
     </div>
   )
 }

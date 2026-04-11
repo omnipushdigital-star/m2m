@@ -3,53 +3,78 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { LayoutDashboard, Users, FileBarChart2, Layers } from 'lucide-react'
 
 const links = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/customers', label: 'Customers' },
-  { href: '/reports', label: 'Reports' },
-  { href: '/plans', label: 'Plans' },
+  { href: '/',          label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/reports',   label: 'Reports',   icon: FileBarChart2 },
+  { href: '/plans',     label: 'Plans',     icon: Layers },
 ]
 
 export function Nav() {
   const pathname = usePathname()
-  return (
-    <header className="sticky top-0 z-10 shadow-md" style={{ background: '#1a237e' }}>
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-8">
-        {/* BSNL brand mark */}
-        <div className="flex items-center gap-2 shrink-0">
-          <span
-            className="text-xs font-bold leading-tight"
-            style={{ color: '#f57c00', letterSpacing: '0.05em' }}
-          >
-            BSNL
-          </span>
-          <span className="text-white/40 text-lg font-thin">|</span>
-          <span className="font-semibold text-sm text-white tracking-wide">M2M Dashboard</span>
-        </div>
 
-        <nav className="flex gap-1 ml-auto">
-          {links.map(({ href, label }) => (
+  return (
+    <aside
+      className="w-56 flex-shrink-0 flex flex-col min-h-screen sticky top-0"
+      style={{ background: '#f57c00' }}
+    >
+      {/* ── Logo block ── */}
+      <div
+        className="px-5 py-5 flex flex-col gap-0.5"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.25)' }}
+      >
+        {/* BSNL sun-burst icon (CSS only) */}
+        <div className="flex items-center gap-2 mb-1">
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: '#1a237e' }}
+          >
+            <span className="text-white font-black text-xs tracking-tighter leading-none">
+              BSNL
+            </span>
+          </div>
+          <div className="leading-none">
+            <p className="text-white font-black text-base tracking-widest leading-none">BSNL</p>
+            <p className="text-white/70 text-[10px] tracking-wide leading-none mt-0.5">
+              Bharat Sanchar Nigam
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Navigation items ── */}
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {links.map(({ href, label, icon: Icon }) => {
+          const active =
+            pathname === href || (href !== '/' && pathname.startsWith(href))
+          return (
             <Link
               key={href}
               href={href}
               className={cn(
-                'px-3 py-1.5 rounded text-sm font-medium transition-colors',
-                pathname === href || (href !== '/' && pathname.startsWith(href))
-                  ? 'text-white'
-                  : 'text-white/70 hover:text-white hover:bg-white/10'
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors',
+                active
+                  ? 'bg-white text-[#f57c00] shadow-sm'
+                  : 'text-white hover:bg-white/20'
               )}
-              style={
-                pathname === href || (href !== '/' && pathname.startsWith(href))
-                  ? { background: '#f57c00' }
-                  : {}
-              }
             >
+              <Icon className="w-4 h-4 shrink-0" />
               {label}
             </Link>
-          ))}
-        </nav>
+          )
+        })}
+      </nav>
+
+      {/* ── Footer tag ── */}
+      <div
+        className="px-5 py-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.25)' }}
+      >
+        <p className="text-white/60 text-[11px] font-medium">M2M / IoT SIM Inventory</p>
+        <p className="text-white/40 text-[10px]">Billing &amp; Activation Tracker</p>
       </div>
-    </header>
+    </aside>
   )
 }
