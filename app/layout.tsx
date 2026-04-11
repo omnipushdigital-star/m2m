@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* ── Top header ── */}
           <header
             className="sticky top-0 z-10 h-14 flex items-center px-6 shadow-md shrink-0"
-            style={{ background: '#1a237e' }}
+            style={{ background: '#1565c0' }}
           >
             <div className="flex flex-col leading-none">
               <span className="text-white font-extrabold text-base tracking-wide leading-tight">

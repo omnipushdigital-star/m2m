@@ -3,6 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { getSupabase } from '@/lib/supabase'
 
+const CR = 1e7  // 1 Crore = 10,000,000
+
 export async function createMonthlyRecord(customerId: string, formData: FormData) {
   const supabase = getSupabase()
   const { error } = await supabase.from('monthly_records').insert({
@@ -12,8 +14,8 @@ export async function createMonthlyRecord(customerId: string, formData: FormData
     deactivations: parseInt(formData.get('deactivations') as string) || 0,
     plan_changes: parseInt(formData.get('plan_changes') as string) || 0,
     active_sims: parseInt(formData.get('active_sims') as string) || 0,
-    abf_amount: parseFloat(formData.get('abf_amount') as string) || 0,
-    revenue_realised: parseFloat(formData.get('revenue_realised') as string) || 0,
+    abf_amount: (parseFloat(formData.get('abf_amount') as string) || 0) / CR,
+    revenue_realised: (parseFloat(formData.get('revenue_realised') as string) || 0) / CR,
     commissioning_pending: parseInt(formData.get('commissioning_pending') as string) || 0,
     notes: (formData.get('notes') as string) || null,
   })
@@ -31,8 +33,8 @@ export async function updateMonthlyRecord(id: string, customerId: string, formDa
     deactivations: parseInt(formData.get('deactivations') as string) || 0,
     plan_changes: parseInt(formData.get('plan_changes') as string) || 0,
     active_sims: parseInt(formData.get('active_sims') as string) || 0,
-    abf_amount: parseFloat(formData.get('abf_amount') as string) || 0,
-    revenue_realised: parseFloat(formData.get('revenue_realised') as string) || 0,
+    abf_amount: (parseFloat(formData.get('abf_amount') as string) || 0) / CR,
+    revenue_realised: (parseFloat(formData.get('revenue_realised') as string) || 0) / CR,
     commissioning_pending: parseInt(formData.get('commissioning_pending') as string) || 0,
     notes: (formData.get('notes') as string) || null,
   }).eq('id', id)

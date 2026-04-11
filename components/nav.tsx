@@ -21,7 +21,7 @@ export function Nav() {
   return (
     <aside
       className="w-56 flex-shrink-0 flex flex-col min-h-screen sticky top-0"
-      style={{ background: '#f57c00' }}
+      style={{ background: '#1565c0' }}
     >
       {/* ── Logo block ── */}
       <div
@@ -51,7 +51,7 @@ export function Nav() {
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors',
                 active
-                  ? 'bg-white text-[#f57c00] shadow-sm'
+                  ? 'bg-white text-[#1565c0] shadow-sm'
                   : 'text-white hover:bg-white/20'
               )}
             >

@@ -91,12 +91,14 @@ export function MonthlyEntryForm({
           <Input id="active_sims" name="active_sims" type="number" defaultValue={record?.active_sims ?? 0} min={0} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="abf_amount">ABF Amount (₹ Cr)</Label>
-          <Input id="abf_amount" name="abf_amount" type="number" step="0.001" defaultValue={record?.abf_amount ?? 0} />
+          <Label htmlFor="abf_amount">ABF Amount (₹) <span className="text-slate-400 font-normal text-xs">— enter in Rupees</span></Label>
+          <Input id="abf_amount" name="abf_amount" type="number" step="1"
+            defaultValue={record ? Math.round((record.abf_amount ?? 0) * 1e7) : 0} min={0} />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="revenue_realised">Revenue Realised (₹ Cr)</Label>
-          <Input id="revenue_realised" name="revenue_realised" type="number" step="0.001" defaultValue={record?.revenue_realised ?? 0} />
+          <Label htmlFor="revenue_realised">Revenue Realised (₹) <span className="text-slate-400 font-normal text-xs">— enter in Rupees</span></Label>
+          <Input id="revenue_realised" name="revenue_realised" type="number" step="1"
+            defaultValue={record ? Math.round((record.revenue_realised ?? 0) * 1e7) : 0} min={0} />
         </div>
         <div className="space-y-1">
           <Label htmlFor="commissioning_pending">Commissioning Pending</Label>
