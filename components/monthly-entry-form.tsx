@@ -7,10 +7,6 @@ import { Label } from '@/components/ui/label'
 import { createMonthlyRecord, updateMonthlyRecord } from '@/actions/monthly-records'
 import type { MonthlyRecord } from '@/lib/types'
 
-function currentMonth() {
-  return new Date().toISOString().slice(0, 7)
-}
-
 export function MonthlyEntryForm({
   customerId,
   record,
