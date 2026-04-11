@@ -24,6 +24,7 @@ export async function createMonthlyRecord(customerId: string, formData: FormData
     throw new Error(error.message)
   }
   revalidatePath(`/customers/${customerId}`)
+  revalidatePath('/')
 }
 
 export async function updateMonthlyRecord(id: string, customerId: string, formData: FormData) {
@@ -40,6 +41,7 @@ export async function updateMonthlyRecord(id: string, customerId: string, formDa
   }).eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath(`/customers/${customerId}`)
+  revalidatePath('/')
 }
 
 export async function deleteMonthlyRecord(id: string, customerId: string) {
@@ -47,4 +49,5 @@ export async function deleteMonthlyRecord(id: string, customerId: string) {
   const { error } = await supabase.from('monthly_records').delete().eq('id', id)
   if (error) throw new Error(error.message)
   revalidatePath(`/customers/${customerId}`)
+  revalidatePath('/')
 }
