@@ -17,7 +17,10 @@ export async function createMonthlyRecord(customerId: string, formData: FormData
     commissioning_pending: parseInt(formData.get('commissioning_pending') as string) || 0,
     notes: (formData.get('notes') as string) || null,
   })
-  if (error) throw new Error(error.message)
+  if (error) {
+    if (error.code === '23505') throw new Error('A record for this month already exists.')
+    throw new Error(error.message)
+  }
   revalidatePath(`/customers/${customerId}`)
 }
 

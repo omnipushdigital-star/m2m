@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition } from 'react'
+import React, { useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,15 +23,21 @@ export function MonthlyEntryForm({
   onDone?: () => void
 }) {
   const [pending, startTransition] = useTransition()
+  const [error, setError] = React.useState<string | null>(null)
 
   function handleSubmit(formData: FormData) {
+    setError(null)
     startTransition(async () => {
-      if (record) {
-        await updateMonthlyRecord(record.id, customerId, formData)
-      } else {
-        await createMonthlyRecord(customerId, formData)
+      try {
+        if (record) {
+          await updateMonthlyRecord(record.id, customerId, formData)
+        } else {
+          await createMonthlyRecord(customerId, formData)
+        }
+        onDone?.()
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Failed to save entry.')
       }
-      onDone?.()
     })
   }
 
@@ -46,7 +52,15 @@ export function MonthlyEntryForm({
             id="month"
             name="month"
             required
-            defaultValue={currentMonth()}
+            defaultValue={(() => {
+              const d = new Date()
+              for (let i = 0; i < 24; i++) {
+                const dt = new Date(d.getFullYear(), d.getMonth() - i, 1)
+                const val = dt.toISOString().slice(0, 7)
+                if (!existingMonths.includes(val)) return val
+              }
+              return ''
+            })()}
             className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
           >
             {Array.from({ length: 24 }, (_, i) => {
@@ -104,6 +118,10 @@ export function MonthlyEntryForm({
           className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
         />
       </div>
+
+      {error && (
+        <p className="text-sm text-red-600 font-medium">{error}</p>
+      )}
 
       <Button type="submit" disabled={pending}>
         {pending ? 'Saving...' : record ? 'Update Entry' : 'Add Entry'}
