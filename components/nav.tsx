@@ -14,10 +14,21 @@ const links = [
 export function Nav() {
   const pathname = usePathname()
   return (
-    <header className="border-b bg-white sticky top-0 z-10">
+    <header className="sticky top-0 z-10 shadow-md" style={{ background: '#1a237e' }}>
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-8">
-        <span className="font-semibold text-sm text-slate-900">M2M Dashboard</span>
-        <nav className="flex gap-1">
+        {/* BSNL brand mark */}
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-xs font-bold leading-tight"
+            style={{ color: '#f57c00', letterSpacing: '0.05em' }}
+          >
+            BSNL
+          </span>
+          <span className="text-white/40 text-lg font-thin">|</span>
+          <span className="font-semibold text-sm text-white tracking-wide">M2M Dashboard</span>
+        </div>
+
+        <nav className="flex gap-1 ml-auto">
           {links.map(({ href, label }) => (
             <Link
               key={href}
@@ -25,9 +36,14 @@ export function Nav() {
               className={cn(
                 'px-3 py-1.5 rounded text-sm font-medium transition-colors',
                 pathname === href || (href !== '/' && pathname.startsWith(href))
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'text-white'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
               )}
+              style={
+                pathname === href || (href !== '/' && pathname.startsWith(href))
+                  ? { background: '#f57c00' }
+                  : {}
+              }
             >
               {label}
             </Link>

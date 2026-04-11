@@ -1,6 +1,13 @@
 import { getSupabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+const cardAccents = [
+  '#1a237e', // navy  — customers
+  '#f57c00', // orange — active SIMs
+  '#2e7d32', // green  — ABF
+  '#283593', // navy-light — commissioning
+]
+
 export async function DashboardCards() {
   const supabase = getSupabase()
   const currentMonth = new Date().toISOString().slice(0, 7)
@@ -14,33 +21,44 @@ export async function DashboardCards() {
   const latestPerCustomer = new Map<string, { active_sims: number; commissioning_pending: number }>()
   for (const r of allLatestRecords ?? []) {
     if (!latestPerCustomer.has(r.customer_id)) {
-      latestPerCustomer.set(r.customer_id, { active_sims: r.active_sims ?? 0, commissioning_pending: r.commissioning_pending ?? 0 })
+      latestPerCustomer.set(r.customer_id, {
+        active_sims: r.active_sims ?? 0,
+        commissioning_pending: r.commissioning_pending ?? 0,
+      })
     }
   }
   const totalActiveSims = Array.from(latestPerCustomer.values()).reduce((s, r) => s + r.active_sims, 0)
-
   const totalAbfThisMonth = (currentMonthRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
   const totalPending = (currentMonthRecords ?? []).reduce((s, r) => s + (r.commissioning_pending ?? 0), 0)
 
   const cards = [
-    { title: 'Total Customers', value: customerCount ?? 0, format: 'count' as const },
-    { title: 'Total Active SIMs', value: totalActiveSims, format: 'count' as const },
-    { title: 'ABF This Month (₹ Cr)', value: totalAbfThisMonth, format: 'decimal' as const },
-    { title: 'Commissioning Pending', value: totalPending, format: 'count' as const },
+    { title: 'Total Customers',       value: customerCount ?? 0,  format: 'count'   as const },
+    { title: 'Total Active SIMs',     value: totalActiveSims,      format: 'count'   as const },
+    { title: 'ABF This Month (₹ Cr)', value: totalAbfThisMonth,    format: 'decimal' as const },
+    { title: 'Commissioning Pending', value: totalPending,         format: 'count'   as const },
   ]
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {cards.map((card) => (
-        <Card key={card.title}>
+      {cards.map((card, i) => (
+        <Card
+          key={card.title}
+          className="overflow-hidden border-0 shadow-sm"
+          style={{ borderTop: `4px solid ${cardAccents[i]}` }}
+        >
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-slate-500">{card.title}</CardTitle>
+            <CardTitle
+              className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: cardAccents[i] }}
+            >
+              {card.title}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
+            <p className="text-2xl font-extrabold text-slate-800">
               {card.format === 'decimal'
                 ? card.value.toFixed(3)
-                : card.value.toLocaleString()}
+                : card.value.toLocaleString('en-IN')}
             </p>
           </CardContent>
         </Card>

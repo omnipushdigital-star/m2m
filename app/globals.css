@@ -3,15 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --background: #f8f9fc;
+  --foreground: #0f172a;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* BSNL brand palette */
+  --bsnl-navy:        #1a237e;
+  --bsnl-navy-dark:   #0d1457;
+  --bsnl-navy-light:  #283593;
+  --bsnl-orange:      #f57c00;
+  --bsnl-orange-light:#ff9800;
+  --bsnl-green:       #2e7d32;
+  --bsnl-green-light: #43a047;
 }
 
 body {
