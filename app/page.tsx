@@ -1,32 +1,87 @@
 import { Suspense } from 'react'
 import { getSupabase } from '@/lib/supabase'
 import { DashboardCards } from '@/components/dashboard-cards'
-import { AbfChart } from '@/components/abf-chart'
+import { BillingTrendChart } from '@/components/billing-trend-chart'
+import { VerticalAbfChart } from '@/components/vertical-abf-chart'
 import { TopCustomersTable } from '@/components/top-customers-table'
+import { NamFunnelPanel } from '@/components/nam-funnel-panel'
 
-async function AbfChartData() {
+// ── Section heading helper ────────────────────────────────────────────────
+function SectionHeading({ title, color }: { title: string; color: string }) {
+  return (
+    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+      <span className="inline-block w-1 h-5 rounded" style={{ background: color }} />
+      {title}
+    </h2>
+  )
+}
+
+// ── Billing trend (ABF + Revenue, last 12 months) ─────────────────────────
+async function BillingTrendData() {
   const supabase = getSupabase()
-  const sixMonthsAgo = new Date()
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
-  const fromMonth = sixMonthsAgo.toISOString().slice(0, 7)
+  const fromMonth = '2025-04'
 
   const { data } = await supabase
     .from('monthly_records')
-    .select('month, abf_amount')
+    .select('month, abf_amount, revenue_realised')
     .gte('month', fromMonth)
+    .lte('month', '2026-03')   // Apr 25 – Mar 26 billing year
 
-  const monthTotals = new Map<string, number>()
+  const abfMap = new Map<string, number>()
+  const revMap = new Map<string, number>()
   for (const r of data ?? []) {
-    monthTotals.set(r.month, (monthTotals.get(r.month) ?? 0) + (r.abf_amount ?? 0))
+    abfMap.set(r.month, (abfMap.get(r.month) ?? 0) + (r.abf_amount ?? 0))
+    revMap.set(r.month, (revMap.get(r.month) ?? 0) + (r.revenue_realised ?? 0))
   }
 
-  const chartData = Array.from(monthTotals.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([month, abf]) => ({ month, abf }))
+  const allMonthKeys = Array.from(abfMap.keys()).concat(Array.from(revMap.keys()))
+  const months = Array.from(new Set(allMonthKeys)).sort()
+  const chartData = months.map(month => ({
+    month: month.slice(0, 7),
+    abf: abfMap.get(month) ?? 0,
+    revenue: revMap.get(month) ?? 0,
+  }))
 
-  return <AbfChart data={chartData} />
+  return <BillingTrendChart data={chartData} />
 }
 
+// ── Vertical-wise ABF ─────────────────────────────────────────────────────
+async function VerticalAbfData() {
+  const supabase = getSupabase()
+
+  const { data: records } = await supabase
+    .from('monthly_records')
+    .select('customer_id, abf_amount, revenue_realised')
+    .gte('month', '2025-04')
+    .lte('month', '2026-03')
+
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('id, product_vertical')
+
+  const verticalMap = new Map(customers?.map(c => [c.id, c.product_vertical ?? 'Other']) ?? [])
+
+  const abfByVertical = new Map<string, number>()
+  const revByVertical = new Map<string, number>()
+  for (const r of records ?? []) {
+    const v = verticalMap.get(r.customer_id) ?? 'Other'
+    abfByVertical.set(v, (abfByVertical.get(v) ?? 0) + (r.abf_amount ?? 0))
+    revByVertical.set(v, (revByVertical.get(v) ?? 0) + (r.revenue_realised ?? 0))
+  }
+
+  const order = ['CM', 'EB', 'CFA', 'Other']
+  const chartData = order
+    .filter(v => abfByVertical.has(v) || revByVertical.has(v))
+    .map(v => ({
+      vertical: v,
+      abf: abfByVertical.get(v) ?? 0,
+      revenue: revByVertical.get(v) ?? 0,
+    }))
+
+  return <VerticalAbfChart data={chartData} />
+}
+
+// ── Dashboard page ────────────────────────────────────────────────────────
 export default function DashboardPage() {
   return (
     <div className="space-y-8">
@@ -44,23 +99,34 @@ export default function DashboardPage() {
         <DashboardCards />
       </Suspense>
 
-      {/* ── ABF Chart ── */}
+      {/* ── Billing Trend ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span className="inline-block w-1 h-5 rounded" style={{ background: '#f57c00' }} />
-          ABF Trend — Last 6 Months (₹ Cr)
-        </h2>
+        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 (₹ Cr)" color="#f57c00" />
         <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
-          <AbfChartData />
+          <BillingTrendData />
         </Suspense>
+      </div>
+
+      {/* ── Two column: Vertical ABF + NAM Funnel ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <SectionHeading title="ABF by Product Vertical — FY 2025-26" color="#1a237e" />
+          <Suspense fallback={<div className="h-56 rounded-lg bg-slate-100 animate-pulse" />}>
+            <VerticalAbfData />
+          </Suspense>
+        </div>
+
+        <div>
+          <SectionHeading title="NAM-wise Sales Funnel Performance" color="#2e7d32" />
+          <Suspense fallback={<div className="h-56 rounded-lg bg-slate-100 animate-pulse" />}>
+            <NamFunnelPanel />
+          </Suspense>
+        </div>
       </div>
 
       {/* ── Top Customers ── */}
       <div>
-        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
-          <span className="inline-block w-1 h-5 rounded" style={{ background: '#2e7d32' }} />
-          Top 10 Customers by Active SIMs
-        </h2>
+        <SectionHeading title="Top 10 Customers by Active SIMs" color="#283593" />
         <Suspense fallback={<div className="h-48 rounded-lg bg-slate-100 animate-pulse" />}>
           <TopCustomersTable />
         </Suspense>

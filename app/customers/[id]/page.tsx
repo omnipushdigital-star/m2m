@@ -40,6 +40,9 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
     .eq('customer_id', params.id)
     .order('month', { ascending: false })
 
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const currentMonthRecord = (monthlyRecords ?? []).find(r => r.month === currentMonth)
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -64,17 +67,39 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
               <CustomerForm customer={customer} />
             </DialogContent>
           </Dialog>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button>+ Add Monthly Entry</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Monthly Entry</DialogTitle>
-              </DialogHeader>
-              <MonthlyEntryForm customerId={params.id} existingMonths={(monthlyRecords ?? []).map(r => r.month)} />
-            </DialogContent>
-          </Dialog>
+
+          {/* Edit current month if record exists, otherwise add new */}
+          {currentMonthRecord ? (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button style={{ background: '#f57c00' }}>
+                  ✎ Edit {currentMonth}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit {currentMonth} Entry</DialogTitle>
+                </DialogHeader>
+                <MonthlyEntryForm
+                  customerId={params.id}
+                  record={currentMonthRecord}
+                  existingMonths={(monthlyRecords ?? []).map(r => r.month)}
+                />
+              </DialogContent>
+            </Dialog>
+          ) : (
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button>+ Add Monthly Entry</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Monthly Entry</DialogTitle>
+                </DialogHeader>
+                <MonthlyEntryForm customerId={params.id} existingMonths={(monthlyRecords ?? []).map(r => r.month)} />
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </div>
 
