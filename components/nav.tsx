@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp, CheckCircle2 } from 'lucide-react'
@@ -24,26 +25,18 @@ export function Nav() {
     >
       {/* ── Logo block ── */}
       <div
-        className="px-5 py-5 flex flex-col gap-0.5"
+        className="px-4 py-4 flex flex-col items-center"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.25)' }}
       >
-        {/* BSNL sun-burst icon (CSS only) */}
-        <div className="flex items-center gap-2 mb-1">
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: '#1a237e' }}
-          >
-            <span className="text-white font-black text-xs tracking-tighter leading-none">
-              BSNL
-            </span>
-          </div>
-          <div className="leading-none">
-            <p className="text-white font-black text-base tracking-widest leading-none">BSNL</p>
-            <p className="text-white/70 text-[10px] tracking-wide leading-none mt-0.5">
-              Bharat Sanchar Nigam
-            </p>
-          </div>
-        </div>
+        <Image
+          src="/bsnl-logo.png"
+          alt="BSNL"
+          width={96}
+          height={96}
+          className="object-contain"
+          priority
+        />
+        <p className="text-white/80 text-[10px] tracking-wide mt-1">Bharat Sanchar Nigam</p>
       </div>
 
       {/* ── Navigation items ── */}
