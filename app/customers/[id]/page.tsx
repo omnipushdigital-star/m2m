@@ -111,8 +111,32 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 pt-4">
+
+          {/* ── Live billing summary from monthly records ── */}
+          {(monthlyRecords ?? []).length > 0 && (() => {
+            const latest = (monthlyRecords ?? [])[0]
+            const totalAbf = (monthlyRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
+            const totalRev = (monthlyRecords ?? []).reduce((s, r) => s + (r.revenue_realised ?? 0), 0)
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Active SIMs (Latest)',        value: latest.active_sims?.toLocaleString('en-IN') ?? '—',   color: '#1a237e' },
+                  { label: `ABF ${latest.month} (₹ Cr)`, value: latest.abf_amount ? latest.abf_amount.toFixed(3) : '—', color: '#f57c00' },
+                  { label: 'Total ABF FY (₹ Cr)',         value: totalAbf.toFixed(3),                                   color: '#f57c00' },
+                  { label: 'Total Revenue FY (₹ Cr)',     value: totalRev.toFixed(3),                                   color: '#2e7d32' },
+                ].map(c => (
+                  <div key={c.label} className="rounded-md bg-white shadow-sm p-3" style={{ borderTop: `3px solid ${c.color}` }}>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: c.color }}>{c.label}</p>
+                    <p className="text-xl font-extrabold text-slate-800 mt-0.5">{c.value}</p>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <InfoCard label="NAM" value={customer.nam_name} />
+            <InfoCard label="Vertical" value={customer.product_vertical} />
             <InfoCard label="City" value={customer.city} />
             <InfoCard label="PO Date" value={customer.po_date} />
             <InfoCard label="PO Number" value={customer.po_letter_number} />
@@ -126,7 +150,6 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
             <InfoCard label="Contract Period" value={customer.contract_period ? `${customer.contract_period}Y` : null} />
             <InfoCard label="Vendor" value={customer.vendor_name} />
             <InfoCard label="Product" value={customer.product_name} />
-            <InfoCard label="Vertical" value={customer.product_vertical} />
             <InfoCard label="CP Name" value={customer.cp_name} />
           </div>
           {customer.details && (
