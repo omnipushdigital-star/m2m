@@ -4,15 +4,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp, CheckCircle2 } from 'lucide-react'
+import { LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp, CheckCircle2, ClipboardList } from 'lucide-react'
 
 const links = [
-  { href: '/',          label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/reports',   label: 'Reports',   icon: FileBarChart2 },
-  { href: '/plans',     label: 'Plans',     icon: Layers },
-  { href: '/funnel/stage1', label: 'Stage 1 — Pipeline', icon: TrendingUp },
-  { href: '/funnel/stage4', label: 'Stage 4 — PO Closed', icon: CheckCircle2 },
+  { href: '/',               label: 'Dashboard',           icon: LayoutDashboard },
+  { href: '/customers',      label: 'Customers',           icon: Users },
+  { href: '/reports',        label: 'Reports',             icon: FileBarChart2 },
+  { href: '/plans',          label: 'Plans',               icon: Layers },
+  { href: '/funnel/stage1',  label: 'Stage 1 — Pipeline',  icon: TrendingUp },
+  { href: '/funnel/stage4',  label: 'Stage 4 — PO Closed', icon: CheckCircle2 },
+  { href: '/ltb',            label: 'Lead to Bill',        icon: ClipboardList },
 ]
 
 export function Nav() {

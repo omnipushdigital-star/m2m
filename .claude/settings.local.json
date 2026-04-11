@@ -49,7 +49,9 @@
       "Bash(head -10 find '/c/Users/Naveen Saini' -maxdepth 3 -iname *bsnl*logo*)",
       "Bash(ls \"D:\\\\Claude Projects\\\\M2M INVENTORY\\\\public\"\" 2>/dev/null || echo \"no public dir\" && ls \"D:/Claude Projects/M2M INVENTORY/ \")",
       "Bash(vercel ls:*)",
-      "Bash(node scripts/update-apr26.js)"
+      "Bash(node scripts/update-apr26.js)",
+      "Bash(node scripts/peek-ltb.js)",
+      "Bash(node scripts/peek-ltb2.js)"
     ]
   }
 }
