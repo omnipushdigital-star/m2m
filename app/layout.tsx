@@ -16,6 +16,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const session = await getSession()
   const role    = await getRole()
 
+  // Login page — plain full-screen layout, no nav/header
+  if (!session) {
+    return (
+      <html lang="en">
+        <body className={inter.className}>
+          {children}
+        </body>
+      </html>
+    )
+  }
+
   return (
     <html lang="en">
       <body className={cn(inter.className, 'flex min-h-screen bg-[#f8f9fc]')}>
@@ -48,12 +59,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 M2M / IoT SIM Inventory
               </span>
 
-              {session && (
-                <HeaderUser
-                  email={session.user.email ?? ''}
-                  role={role ?? 'viewer'}
-                />
-              )}
+              <HeaderUser
+                email={session.user.email ?? ''}
+                role={role ?? 'viewer'}
+              />
             </div>
           </header>
 

@@ -22,8 +22,8 @@ export async function DashboardCards() {
     supabase.from('customers').select('*', { count: 'exact', head: true }),
     supabase.from('monthly_records').select('abf_amount, commissioning_pending, active_sims').eq('month', currentMonth),
     supabase.from('monthly_records').select('customer_id, active_sims, commissioning_pending').order('month', { ascending: false }),
+    supabase.from('monthly_records').select('abf_amount').gte('month', '2026-04').lte('month', '2027-03'),
     supabase.from('monthly_records').select('abf_amount').gte('month', '2025-04').lte('month', '2026-03'),
-    supabase.from('monthly_records').select('abf_amount').gte('month', '2024-04').lte('month', '2025-03'),
   ])
 
   const latestPerCustomer = new Map<string, { active_sims: number; commissioning_pending: number }>()
@@ -38,8 +38,8 @@ export async function DashboardCards() {
   const totalActiveSims    = Array.from(latestPerCustomer.values()).reduce((s, r) => s + r.active_sims, 0)
   const totalAbfThisMonth  = (currentMonthRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
   const totalPending       = (currentMonthRecords ?? []).reduce((s, r) => s + (r.commissioning_pending ?? 0), 0)
-  const totalAbfFY2526     = (fy2526Records ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
-  const totalAbfFY2425     = (fy2425Records ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
+  const totalAbfFY2627     = (fy2526Records ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
+  const totalAbfLastFY     = (fy2425Records ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
 
   const topCards = [
     { title: 'Total Customers',       value: customerCount ?? 0, format: 'count'   as const },
@@ -50,16 +50,16 @@ export async function DashboardCards() {
 
   const fyCards = [
     {
-      title: 'Total ABF — FY 2025-26 (₹ Cr)',
-      value: totalAbfFY2526,
+      title: 'Total ABF — FY 2026-27 (₹ Cr)',
+      value: totalAbfFY2627,
       color: '#f57c00',
-      sub: 'Apr 2025 – Mar 2026',
+      sub: 'Current FY · Apr 2026 – Mar 2027',
     },
     {
-      title: 'Total ABF — FY 2024-25 (₹ Cr)',
-      value: totalAbfFY2425,
+      title: 'Total ABF — FY 2025-26 (₹ Cr)',
+      value: totalAbfLastFY,
       color: '#1565c0',
-      sub: 'Apr 2024 – Mar 2025',
+      sub: 'Last FY · Apr 2025 – Mar 2026',
     },
   ]
 

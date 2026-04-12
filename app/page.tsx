@@ -103,7 +103,7 @@ export default function DashboardPage() {
 
       {/* ── Billing Trend ── */}
       <div>
-        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 (₹ Cr)" color="#f57c00" />
+        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 (₹ Cr) · Historical" color="#f57c00" />
         <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
           <BillingTrendData />
         </Suspense>
