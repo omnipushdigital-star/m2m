@@ -1,40 +1,36 @@
 import { getSupabase } from '@/lib/supabase'
-import { MonthlyReportTable } from '@/components/monthly-report-table'
+import { ReportBuilder } from '@/components/report-builder'
 
-export default async function ReportsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ month?: string }>
-}) {
+export const metadata = { title: 'Custom Report Builder' }
+export const dynamic = 'force-dynamic'
+
+export default async function ReportsPage() {
   const supabase = getSupabase()
-  const params = await searchParams
 
-  const { data: monthRows } = await supabase
-    .from('monthly_records')
-    .select('month')
-    .order('month', { ascending: false })
+  const [{ data: monthRows }, { data: namRows }] = await Promise.all([
+    supabase
+      .from('monthly_records')
+      .select('month')
+      .order('month', { ascending: false }),
+    supabase
+      .from('customers')
+      .select('nam_name')
+      .not('nam_name', 'is', null)
+      .order('nam_name'),
+  ])
 
-  const allMonths = Array.from(new Set((monthRows ?? []).map((r) => r.month)))
-  if (allMonths.length === 0) {
-    allMonths.push(new Date().toISOString().slice(0, 7))
-  }
+  const allMonths = Array.from(new Set((monthRows ?? []).map(r => r.month)))
+  if (allMonths.length === 0) allMonths.push(new Date().toISOString().slice(0, 7))
 
-  const month = params.month ?? allMonths[0]
-
-  const { data: records } = await supabase
-    .from('monthly_records')
-    .select('*, customer:customers(name, nam_name, product_vertical)')
-    .eq('month', month)
-    .order('created_at')
+  const allNams = Array.from(new Set((namRows ?? []).map(r => r.nam_name as string).filter(Boolean))).sort()
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Monthly Report</h1>
-      <MonthlyReportTable
-        rows={(records ?? []) as unknown as import('@/lib/export').ReportRow[]}
-        month={month}
-        allMonths={allMonths}
-      />
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Custom Report Builder</h1>
+        <p className="text-sm text-slate-500 mt-1">Select a report type, configure filters, preview data and export to Excel</p>
+      </div>
+      <ReportBuilder allMonths={allMonths} allNams={allNams} />
     </div>
   )
 }
