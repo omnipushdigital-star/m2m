@@ -51,7 +51,8 @@
       "Bash(vercel ls:*)",
       "Bash(node scripts/update-apr26.js)",
       "Bash(node scripts/peek-ltb.js)",
-      "Bash(node scripts/peek-ltb2.js)"
+      "Bash(node scripts/peek-ltb2.js)",
+      "Bash(node scripts/set-roles.js)"
     ]
   }
 }
