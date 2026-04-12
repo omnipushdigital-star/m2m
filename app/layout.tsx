@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { Nav } from '@/components/nav'
+import { Nav, MobileNav } from '@/components/nav'
 import { HeaderUser } from '@/components/header-user'
 import { getSession, getRole } from '@/lib/supabase-server'
 
@@ -39,21 +39,25 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
           {/* ── Top header ── */}
           <header
-            className="sticky top-0 z-10 h-14 flex items-center px-6 shadow-md shrink-0"
+            className="sticky top-0 z-10 h-14 flex items-center px-3 md:px-6 shadow-md shrink-0 gap-3"
             style={{ background: '#1565c0' }}
           >
-            <div className="flex flex-col leading-none">
-              <span className="text-white font-extrabold text-base tracking-wide leading-tight">
+            {/* Mobile hamburger */}
+            <MobileNav />
+
+            {/* Title */}
+            <div className="flex flex-col leading-none min-w-0">
+              <span className="text-white font-extrabold text-sm md:text-base tracking-wide leading-tight truncate">
                 EB PLATINUM UNIT GURGAON
               </span>
-              <span className="text-sm font-semibold tracking-widest mt-0.5" style={{ color: '#43a047' }}>
+              <span className="text-xs md:text-sm font-semibold tracking-widest mt-0.5" style={{ color: '#43a047' }}>
                 CNTx- N
               </span>
             </div>
 
-            <div className="ml-auto flex items-center gap-4">
+            <div className="ml-auto flex items-center gap-2 md:gap-4 shrink-0">
               <span
-                className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white"
+                className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-bold text-white whitespace-nowrap"
                 style={{ background: '#f57c00' }}
               >
                 BUSINESS ANALYTICS PORTAL
@@ -67,7 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </header>
 
           {/* ── Page content ── */}
-          <main className="flex-1 px-6 py-6">{children}</main>
+          <main className="flex-1 px-3 md:px-6 py-4 md:py-6">{children}</main>
 
           {/* ── Footer ── */}
           <footer className="px-6 py-3 text-center text-xs text-slate-400 border-t border-slate-200">

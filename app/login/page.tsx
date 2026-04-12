@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: '#f0f4f8' }}>
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: '#f0f4f8' }}>
       <div className="w-full max-w-sm">
         {/* Card */}
         <div className="bg-white rounded-2xl shadow-lg overflow-hidden">

@@ -30,7 +30,7 @@ export function BillingTrendChart({ data }: { data: DataPoint[] }) {
   }
 
   return (
-    <div className="h-72">
+    <div className="h-56 md:h-72">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={enriched} margin={{ top: 8, right: 40, bottom: 8, left: 0 }} barCategoryGap="25%">
           <CartesianGrid strokeDasharray="3 3" vertical={false} />

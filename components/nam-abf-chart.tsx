@@ -19,7 +19,7 @@ export function NamAbfChart({ data }: { data: NamDataPoint[] }) {
   }
 
   return (
-    <div className="h-64">
+    <div className="h-52 md:h-64">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           layout="vertical"

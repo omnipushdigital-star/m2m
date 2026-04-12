@@ -19,7 +19,7 @@ export function VerticalAbfChart({
   data: { vertical: string; abf: number; revenue: number }[]
 }) {
   return (
-    <div className="h-56">
+    <div className="h-44 md:h-56">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 24, bottom: 4, left: 40 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} />

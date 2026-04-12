@@ -132,18 +132,18 @@ async function NamAbfData() {
 // ── Dashboard page ────────────────────────────────────────────────────────
 export default function DashboardPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
 
       {/* ── KPI Cards ── */}
       <Suspense
         fallback={
           <div className="space-y-4">
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
               {[...Array(4)].map((_, i) => (
                 <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
               ))}
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
               ))}
@@ -156,43 +156,53 @@ export default function DashboardPage() {
 
       {/* ── Billing Trend ── */}
       <div>
-        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 & FY 2026-27 (₹ Cr)" color="#f57c00" />
-        <Suspense fallback={<div className="h-72 rounded-lg bg-slate-100 animate-pulse" />}>
-          <BillingTrendData />
-        </Suspense>
+        <SectionHeading title="Monthly ABF & Revenue — FY 2025-26 & 2026-27 (₹ Cr)" color="#f57c00" />
+        <div className="bg-white rounded-lg shadow-sm p-3 md:p-4">
+          <Suspense fallback={<div className="h-56 md:h-72 rounded bg-slate-100 animate-pulse" />}>
+            <BillingTrendData />
+          </Suspense>
+        </div>
       </div>
 
       {/* ── NAM-wise ABF & Revenue ── */}
       <div>
         <SectionHeading title="NAM-wise ABF & Revenue — FY 2025-26 (₹ Cr)" color="#2e7d32" />
-        <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
-          <NamAbfData />
-        </Suspense>
+        <div className="bg-white rounded-lg shadow-sm p-3 md:p-4">
+          <Suspense fallback={<div className="h-52 md:h-64 rounded bg-slate-100 animate-pulse" />}>
+            <NamAbfData />
+          </Suspense>
+        </div>
       </div>
 
       {/* ── Two column: Vertical ABF + NAM Funnel ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div>
           <SectionHeading title="ABF by Product Vertical — FY 2025-26" color="#1a237e" />
-          <Suspense fallback={<div className="h-56 rounded-lg bg-slate-100 animate-pulse" />}>
-            <VerticalAbfData />
-          </Suspense>
+          <div className="bg-white rounded-lg shadow-sm p-3 md:p-4">
+            <Suspense fallback={<div className="h-44 md:h-56 rounded bg-slate-100 animate-pulse" />}>
+              <VerticalAbfData />
+            </Suspense>
+          </div>
         </div>
 
         <div>
           <SectionHeading title="NAM-wise Sales Funnel Performance" color="#2e7d32" />
-          <Suspense fallback={<div className="h-56 rounded-lg bg-slate-100 animate-pulse" />}>
-            <NamFunnelPanel />
-          </Suspense>
+          <div className="overflow-x-auto rounded-lg shadow-sm">
+            <Suspense fallback={<div className="h-44 rounded bg-slate-100 animate-pulse" />}>
+              <NamFunnelPanel />
+            </Suspense>
+          </div>
         </div>
       </div>
 
       {/* ── Top Customers ── */}
       <div>
         <SectionHeading title="Top 10 Customers by Active SIMs" color="#283593" />
-        <Suspense fallback={<div className="h-48 rounded-lg bg-slate-100 animate-pulse" />}>
-          <TopCustomersTable />
-        </Suspense>
+        <div className="overflow-x-auto rounded-lg shadow-sm">
+          <Suspense fallback={<div className="h-48 rounded bg-slate-100 animate-pulse" />}>
+            <TopCustomersTable />
+          </Suspense>
+        </div>
       </div>
 
     </div>
