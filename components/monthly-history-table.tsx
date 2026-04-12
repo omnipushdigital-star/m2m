@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MonthlyEntryForm } from './monthly-entry-form'
 import { deleteMonthlyRecord } from '@/actions/monthly-records'
+import { Download } from 'lucide-react'
+import { downloadExcel } from '@/lib/export-excel'
 import type { MonthlyRecord } from '@/lib/types'
 
 export function MonthlyHistoryTable({
@@ -22,8 +24,32 @@ export function MonthlyHistoryTable({
     return <p className="text-sm text-slate-500">No monthly records yet. Click &quot;+ Add Monthly Entry&quot; to get started.</p>
   }
 
+  function handleExport() {
+    downloadExcel(records.map(r => ({
+      'Month':                r.month,
+      'Activations':          r.activations,
+      'Deactivations':        r.deactivations,
+      'Plan Changes':         r.plan_changes,
+      'Active SIMs':          r.active_sims,
+      'ABF (₹ Cr)':           r.abf_amount,
+      'Revenue (₹ Cr)':       r.revenue_realised,
+      'Commissioning Pending':r.commissioning_pending,
+      'Notes':                r.notes ?? '',
+    })), `Monthly_History_${new Date().toISOString().slice(0, 10)}`)
+  }
+
   return (
     <>
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-xs font-semibold transition-opacity hover:opacity-90"
+          style={{ background: '#2e7d32' }}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export Excel
+        </button>
+      </div>
       <div className="rounded-md border overflow-x-auto">
         <table className="w-full text-sm whitespace-nowrap">
           <thead className="bg-slate-50">

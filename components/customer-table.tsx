@@ -4,6 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Download } from 'lucide-react'
+import { downloadExcel } from '@/lib/export-excel'
 import type { Customer, CustomerPlan } from '@/lib/types'
 
 type CustomerRow = Customer & { customer_plans: CustomerPlan[] }
@@ -16,14 +18,40 @@ export function CustomerTable({ customers }: { customers: CustomerRow[] }) {
     (c.nam_name ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
+  function handleExport() {
+    downloadExcel(filtered.map(c => ({
+      'Customer Name':    c.name,
+      'City':             c.city ?? '',
+      'NAM':              c.nam_name ?? '',
+      'Vertical':         c.product_vertical ?? '',
+      'Plans':            c.customer_plans.length,
+      'Committed Qty':    c.quantity ?? '',
+      'Commissioned Qty': c.commissioned_qty ?? '',
+      'Billing Cycle':    c.billing_cycle ?? '',
+      'PO Date':          c.po_date ?? '',
+      'Contract (Y)':     c.contract_period ?? '',
+      'Vendor':           c.vendor_name ?? '',
+    })), `Customers_${new Date().toISOString().slice(0, 10)}`)
+  }
+
   return (
     <div className="space-y-4">
-      <Input
-        placeholder="Search by customer name or NAM..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="max-w-sm"
-      />
+      <div className="flex items-center gap-3">
+        <Input
+          placeholder="Search by customer name or NAM..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-sm"
+        />
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-xs font-semibold transition-opacity hover:opacity-90 whitespace-nowrap"
+          style={{ background: '#2e7d32' }}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export Excel ({filtered.length})
+        </button>
+      </div>
       <div className="rounded-md border">
         <table className="w-full text-sm">
           <thead className="bg-slate-50">

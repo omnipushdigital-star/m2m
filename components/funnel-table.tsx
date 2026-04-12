@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Download } from 'lucide-react'
+import { downloadExcel } from '@/lib/export-excel'
 
 const categoryColors: Record<string, string> = {
   GOVT:    '#1a237e',
@@ -127,20 +129,67 @@ export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }
   const stage4Cols = 7  // opp_id, PO Date, Contract, Vertical, Comm.Qty, Monthly ABF, ABF Gen
   const stage1Cols = 4  // Commitment, Wk1, Business Type, Remarks
 
+  function handleExport() {
+    if (stage === 4) {
+      downloadExcel(filtered.map(r => ({
+        'Opp ID':              r.opp_id ?? '',
+        'Customer':            r.customer_name,
+        'NAM':                 r.nam_name ?? '',
+        'Category':            r.main_category ?? '',
+        'Product':             r.product_name ?? '',
+        'Vertical':            r.product_vertical ?? '',
+        'Qty':                 r.quantity ?? '',
+        'PO Value (₹ Cr)':     r.po_value ?? '',
+        'PO Date':             r.po_date ?? '',
+        'Contract (Y)':        r.contract_period ?? '',
+        'Commissioned Qty':    r.commissioned_qty ?? '',
+        'Monthly ABF (₹ Cr)':  monthlyAbf(r) != null ? parseFloat(monthlyAbf(r)!.toFixed(3)) : '',
+        'ABF Generated (₹ Cr)':r.abf_generated_total ?? '',
+        'Status':              r.commissioned_status ?? '',
+        'Business Type':       r.business_type ?? '',
+      })), `Stage4_Funnel_${new Date().toISOString().slice(0,10)}`)
+    } else {
+      downloadExcel(filtered.map(r => ({
+        'Customer':      r.customer_name,
+        'NAM':           r.nam_name ?? '',
+        'Category':      r.main_category ?? '',
+        'Product':       r.product_name ?? '',
+        'Qty':           r.quantity ?? '',
+        'Value (₹ Cr)':  r.base_tariff ?? '',
+        'Commitment':    r.commitment ?? '',
+        'Stage Wk1':     r.stage_week1 ?? '',
+        'Business Type': r.business_type ?? '',
+        'Remarks':       r.remarks_current ?? '',
+      })), `Stage1_Funnel_${new Date().toISOString().slice(0,10)}`)
+    }
+  }
+
   return (
     <div className="space-y-3">
-      {hasFilter && (
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span>Showing <strong className="text-slate-800">{filtered.length}</strong> of {data.length} rows</span>
-          <button
-            onClick={() => setFilters({ customer: '', nam: '', category: '', product: '', business_type: '', status: '', vertical: '' })}
-            className="px-2 py-0.5 rounded text-white text-xs font-medium"
-            style={{ background: '#f57c00' }}
-          >
-            Clear filters
-          </button>
+          {hasFilter && (
+            <>
+              <span>Showing <strong className="text-slate-800">{filtered.length}</strong> of {data.length} rows</span>
+              <button
+                onClick={() => setFilters({ customer: '', nam: '', category: '', product: '', business_type: '', status: '', vertical: '' })}
+                className="px-2 py-0.5 rounded text-white text-xs font-medium"
+                style={{ background: '#f57c00' }}
+              >
+                Clear filters
+              </button>
+            </>
+          )}
         </div>
-      )}
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-white text-xs font-semibold transition-opacity hover:opacity-90"
+          style={{ background: '#2e7d32' }}
+        >
+          <Download className="w-3.5 h-3.5" />
+          Export Excel ({filtered.length})
+        </button>
+      </div>
 
       <div className="rounded-md border overflow-x-auto bg-white">
         <table className="w-full text-sm whitespace-nowrap">

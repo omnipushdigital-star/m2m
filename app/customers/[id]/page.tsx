@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CustomerPlan, Plan } from '@/lib/types'
+import { ActiveLeadsExport } from '@/components/active-leads-export'
 
 export const dynamic = 'force-dynamic'
 
@@ -197,7 +198,7 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
 
         {(activeLeads ?? []).length > 0 && (
           <TabsContent value="leads" className="pt-4">
-            <ActiveLeadsTab leads={activeLeads ?? []} />
+            <ActiveLeadsTab leads={activeLeads ?? []} customerName={customer.name} />
           </TabsContent>
         )}
       </Tabs>
@@ -237,7 +238,7 @@ type ActiveLead = {
   nam_name: string | null
 }
 
-function ActiveLeadsTab({ leads }: { leads: ActiveLead[] }) {
+function ActiveLeadsTab({ leads, customerName }: { leads: ActiveLead[]; customerName: string }) {
   const totalCommQty  = leads.reduce((s, l) => s + (l.commissioned_qty ?? 0), 0)
   const totalMonthly  = leads.reduce((s, l) => {
     if (!l.annualized_value) return s
@@ -250,6 +251,9 @@ function ActiveLeadsTab({ leads }: { leads: ActiveLead[] }) {
   return (
     <div className="space-y-4">
       {/* Summary KPIs */}
+      <div className="flex justify-end">
+        <ActiveLeadsExport leads={leads} customerName={customerName} />
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
           { label: 'Active POs',             value: String(leads.length),                              color: '#1a237e' },
