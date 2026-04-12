@@ -154,7 +154,7 @@ export function MobileNav() {
               <div className="flex items-center gap-3">
                 <Image src="/bsnl-logo.png" alt="BSNL" width={40} height={40} className="object-contain" priority />
                 <div>
-                  <p className="text-white font-extrabold text-sm leading-tight">EB PLATINUM UNIT</p>
+                  <p className="text-white font-extrabold text-sm leading-tight">EB PLATINUM GURGAON</p>
                   <p className="text-white/60 text-[10px]">BUSINESS ANALYTICS PORTAL</p>
                 </div>
               </div>

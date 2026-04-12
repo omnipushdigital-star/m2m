@@ -48,7 +48,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {/* Title */}
             <div className="flex flex-col leading-none min-w-0">
               <span className="text-white font-extrabold text-sm md:text-base tracking-wide leading-tight truncate">
-                EB PLATINUM UNIT GURGAON
+                EB PLATINUM GURGAON
               </span>
               <span className="text-xs md:text-sm font-semibold tracking-widest mt-0.5" style={{ color: '#43a047' }}>
                 CNTx- N
