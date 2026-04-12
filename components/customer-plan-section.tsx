@@ -11,10 +11,12 @@ export function CustomerPlanSection({
   customerId,
   customerPlans,
   allPlans,
+  isAdmin = false,
 }: {
   customerId: string
   customerPlans: (CustomerPlan & { plan: Plan })[]
   allPlans: Plan[]
+  isAdmin?: boolean
 }) {
   const [selectedPlanId, setSelectedPlanId] = useState('')
   const [simCount, setSimCount] = useState('')
@@ -40,7 +42,7 @@ export function CustomerPlanSection({
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Plan</th>
                 <th className="px-4 py-2 text-right font-medium">SIM Count</th>
-                <th className="px-4 py-2 text-right font-medium">Actions</th>
+                {isAdmin && <th className="px-4 py-2 text-right font-medium">Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -48,15 +50,17 @@ export function CustomerPlanSection({
                 <tr key={cp.id} className="border-t">
                   <td className="px-4 py-2">{cp.plan.plan_name}</td>
                   <td className="px-4 py-2 text-right font-medium">{cp.sim_count.toLocaleString()}</td>
-                  <td className="px-4 py-2 text-right">
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => removeCustomerPlan(cp.id, customerId)}
-                    >
-                      Remove
-                    </Button>
-                  </td>
+                  {isAdmin && (
+                    <td className="px-4 py-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => removeCustomerPlan(cp.id, customerId)}
+                      >
+                        Remove
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
               <tr className="border-t bg-slate-50">
@@ -73,7 +77,7 @@ export function CustomerPlanSection({
         <p className="text-sm text-slate-500">No plans assigned yet.</p>
       )}
 
-      {availablePlans.length > 0 && (
+      {isAdmin && availablePlans.length > 0 && (
         <div className="flex gap-2 items-end">
           <div className="space-y-1">
             <Label>Assign Plan</Label>

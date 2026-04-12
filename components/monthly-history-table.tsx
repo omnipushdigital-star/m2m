@@ -10,9 +10,11 @@ import type { MonthlyRecord } from '@/lib/types'
 export function MonthlyHistoryTable({
   records,
   customerId,
+  isAdmin = false,
 }: {
   records: MonthlyRecord[]
   customerId: string
+  isAdmin?: boolean
 }) {
   const [editing, setEditing] = useState<MonthlyRecord | null>(null)
 
@@ -35,7 +37,7 @@ export function MonthlyHistoryTable({
               <th className="px-3 py-2 text-right font-medium">Revenue (₹ Cr)</th>
               <th className="px-3 py-2 text-right font-medium">Pending</th>
               <th className="px-3 py-2 text-left font-medium">Notes</th>
-              <th className="px-3 py-2 text-right font-medium">Actions</th>
+              {isAdmin && <th className="px-3 py-2 text-right font-medium">Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -50,12 +52,14 @@ export function MonthlyHistoryTable({
                 <td className="px-3 py-2 text-right">{r.revenue_realised.toFixed(3)}</td>
                 <td className="px-3 py-2 text-right">{r.commissioning_pending.toLocaleString()}</td>
                 <td className="px-3 py-2 text-slate-600 max-w-xs truncate">{r.notes ?? '—'}</td>
-                <td className="px-3 py-2 text-right space-x-1">
-                  <Button size="sm" variant="outline" onClick={() => setEditing(r)}>Edit</Button>
-                  <Button size="sm" variant="destructive" onClick={() => {
-                    if (confirm(`Delete record for ${r.month}?`)) deleteMonthlyRecord(r.id, customerId)
-                  }}>Del</Button>
-                </td>
+                {isAdmin && (
+                  <td className="px-3 py-2 text-right space-x-1">
+                    <Button size="sm" variant="outline" onClick={() => setEditing(r)}>Edit</Button>
+                    <Button size="sm" variant="destructive" onClick={() => {
+                      if (confirm(`Delete record for ${r.month}?`)) deleteMonthlyRecord(r.id, customerId)
+                    }}>Del</Button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

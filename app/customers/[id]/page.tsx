@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getSupabase } from '@/lib/supabase'
+import { getRole } from '@/lib/supabase-server'
 import { CustomerPlanSection } from '@/components/customer-plan-section'
 import { CustomerForm } from '@/components/customer-form'
 import { MonthlyEntryForm } from '@/components/monthly-entry-form'
@@ -15,6 +16,8 @@ import type { CustomerPlan, Plan } from '@/lib/types'
 
 export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
   const supabase = getSupabase()
+  const role = await getRole()
+  const isAdmin = role === 'admin'
 
   const { data: customer } = await supabase
     .from('customers')
@@ -55,52 +58,54 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
             {customer.commissioned_status && <Badge variant="outline">{customer.commissioned_status}</Badge>}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline">Edit Customer</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Edit Customer</DialogTitle>
-              </DialogHeader>
-              <CustomerForm customer={customer} />
-            </DialogContent>
-          </Dialog>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline">Edit Customer</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Edit Customer</DialogTitle>
+                </DialogHeader>
+                <CustomerForm customer={customer} />
+              </DialogContent>
+            </Dialog>
 
-          {/* Edit current month if record exists, otherwise add new */}
-          {currentMonthRecord ? (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button style={{ background: '#f57c00' }}>
-                  ✎ Edit {currentMonth}
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Edit {currentMonth} Entry</DialogTitle>
-                </DialogHeader>
-                <MonthlyEntryForm
-                  customerId={params.id}
-                  record={currentMonthRecord}
-                  existingMonths={(monthlyRecords ?? []).map(r => r.month)}
-                />
-              </DialogContent>
-            </Dialog>
-          ) : (
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button>+ Add Monthly Entry</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add Monthly Entry</DialogTitle>
-                </DialogHeader>
-                <MonthlyEntryForm customerId={params.id} existingMonths={(monthlyRecords ?? []).map(r => r.month)} />
-              </DialogContent>
-            </Dialog>
-          )}
-        </div>
+            {/* Edit current month if record exists, otherwise add new */}
+            {currentMonthRecord ? (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button style={{ background: '#f57c00' }}>
+                    ✎ Edit {currentMonth}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Edit {currentMonth} Entry</DialogTitle>
+                  </DialogHeader>
+                  <MonthlyEntryForm
+                    customerId={params.id}
+                    record={currentMonthRecord}
+                    existingMonths={(monthlyRecords ?? []).map(r => r.month)}
+                  />
+                </DialogContent>
+              </Dialog>
+            ) : (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button>+ Add Monthly Entry</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Monthly Entry</DialogTitle>
+                  </DialogHeader>
+                  <MonthlyEntryForm customerId={params.id} existingMonths={(monthlyRecords ?? []).map(r => r.month)} />
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        )}
       </div>
 
       <Tabs defaultValue="overview">
@@ -164,13 +169,13 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
           <CustomerPlanSection
             customerId={params.id}
             customerPlans={(customerPlans ?? []) as (CustomerPlan & { plan: Plan })[]}
-
             allPlans={allPlans ?? []}
+            isAdmin={isAdmin}
           />
         </TabsContent>
 
         <TabsContent value="monthly" className="pt-4">
-          <MonthlyHistoryTable records={monthlyRecords ?? []} customerId={params.id} />
+          <MonthlyHistoryTable records={monthlyRecords ?? []} customerId={params.id} isAdmin={isAdmin} />
         </TabsContent>
       </Tabs>
     </div>
