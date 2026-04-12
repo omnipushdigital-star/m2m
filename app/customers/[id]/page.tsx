@@ -14,6 +14,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import type { CustomerPlan, Plan } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 export default async function CustomerDetailPage({ params }: { params: { id: string } }) {
   const supabase = getSupabase()
   const role = await getRole()
@@ -42,6 +44,13 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
     .select('*')
     .eq('customer_id', params.id)
     .order('month', { ascending: false })
+
+  // Active leads (Stage 4 opportunities) — match by customer name
+  const { data: activeLeads } = await supabase
+    .from('funnel_opportunities')
+    .select('id, opp_id, product_name, product_vertical, po_date, po_value, contract_period, quantity, commissioned_qty, annualized_value, abf_generated_total, commissioned_status, billing_cycle, nam_name')
+    .eq('funnel_stage', 4)
+    .ilike('customer_name', customer.name)
 
   const currentMonth = new Date().toISOString().slice(0, 7)
   const currentMonthRecord = (monthlyRecords ?? []).find(r => r.month === currentMonth)
@@ -113,6 +122,14 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="monthly">Monthly History</TabsTrigger>
+          {(activeLeads ?? []).length > 0 && (
+            <TabsTrigger value="leads">
+              Active Leads
+              <span className="ml-1.5 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-green-600 text-white">
+                {(activeLeads ?? []).length}
+              </span>
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 pt-4">
@@ -177,6 +194,12 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
         <TabsContent value="monthly" className="pt-4">
           <MonthlyHistoryTable records={monthlyRecords ?? []} customerId={params.id} isAdmin={isAdmin} />
         </TabsContent>
+
+        {(activeLeads ?? []).length > 0 && (
+          <TabsContent value="leads" className="pt-4">
+            <ActiveLeadsTab leads={activeLeads ?? []} />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   )
@@ -187,6 +210,148 @@ function InfoCard({ label, value }: { label: string; value?: string | null }) {
     <div className="rounded-md border p-3">
       <p className="text-xs font-medium text-slate-500">{label}</p>
       <p className="text-sm font-medium mt-0.5">{value ?? '—'}</p>
+    </div>
+  )
+}
+
+const verticalColors: Record<string, { bg: string; text: string }> = {
+  CM:  { bg: '#e3f2fd', text: '#0d47a1' },
+  EB:  { bg: '#e8f5e9', text: '#1b5e20' },
+  CFA: { bg: '#fce4ec', text: '#880e4f' },
+}
+
+type ActiveLead = {
+  id: string
+  opp_id: number | null
+  product_name: string | null
+  product_vertical: string | null
+  po_date: string | null
+  po_value: number | null
+  contract_period: number | null
+  quantity: number | null
+  commissioned_qty: number | null
+  annualized_value: number | null
+  abf_generated_total: number | null
+  commissioned_status: string | null
+  billing_cycle: string | null
+  nam_name: string | null
+}
+
+function ActiveLeadsTab({ leads }: { leads: ActiveLead[] }) {
+  const totalCommQty  = leads.reduce((s, l) => s + (l.commissioned_qty ?? 0), 0)
+  const totalMonthly  = leads.reduce((s, l) => {
+    if (!l.annualized_value) return s
+    const frac = (l.quantity && l.commissioned_qty) ? Math.min(l.commissioned_qty / l.quantity, 1) : 1
+    return s + (l.annualized_value / 12) * frac
+  }, 0)
+  const totalAbfGen   = leads.reduce((s, l) => s + (l.abf_generated_total ?? 0), 0)
+  const totalPO       = leads.reduce((s, l) => s + (l.po_value ?? 0), 0)
+
+  return (
+    <div className="space-y-4">
+      {/* Summary KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: 'Active POs',             value: String(leads.length),                              color: '#1a237e' },
+          { label: 'Total PO Value (₹ Cr)',  value: totalPO.toFixed(2),                               color: '#2e7d32' },
+          { label: 'Monthly ABF (₹ Cr)',     value: totalMonthly.toFixed(3),                          color: '#0d47a1' },
+          { label: 'ABF Generated (₹ Cr)',   value: totalAbfGen.toFixed(3),                           color: '#6a1b9a' },
+        ].map(c => (
+          <div key={c.label} className="rounded-md bg-white shadow-sm p-3" style={{ borderTop: `3px solid ${c.color}` }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: c.color }}>{c.label}</p>
+            <p className="text-xl font-extrabold text-slate-800 mt-0.5">{c.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Leads table */}
+      <div className="rounded-md border overflow-x-auto bg-white">
+        <table className="w-full text-sm whitespace-nowrap">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Opp ID</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Product</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Vertical</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">PO Date</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">PO Value (₹ Cr)</th>
+              <th className="px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide">Contract (Y)</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Qty</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Commissioned</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">Monthly ABF (₹ Cr)</th>
+              <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide">ABF Generated (₹ Cr)</th>
+              <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leads.map((l, i) => {
+              const frac = (l.quantity && l.commissioned_qty) ? Math.min(l.commissioned_qty / l.quantity, 1) : 1
+              const mAbf = l.annualized_value ? (l.annualized_value / 12) * frac : null
+              const vc = verticalColors[l.product_vertical ?? '']
+              return (
+                <tr key={l.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-500">{l.opp_id ?? '—'}</td>
+                  <td className="px-3 py-2 text-slate-700 max-w-[180px] truncate" title={l.product_name ?? ''}>{l.product_name ?? '—'}</td>
+                  <td className="px-3 py-2 text-center">
+                    {l.product_vertical ? (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-bold"
+                        style={vc ? { background: vc.bg, color: vc.text } : { background: '#f3f4f6', color: '#374151' }}
+                      >
+                        {l.product_vertical}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-slate-600">{l.po_date ?? '—'}</td>
+                  <td className="px-3 py-2 text-right font-medium text-green-700">
+                    {l.po_value != null ? Number(l.po_value).toFixed(2) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-center">{l.contract_period ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">{l.quantity ? Number(l.quantity).toLocaleString('en-IN') : '—'}</td>
+                  <td className="px-3 py-2 text-right">{l.commissioned_qty ? Number(l.commissioned_qty).toLocaleString('en-IN') : '—'}</td>
+                  <td className="px-3 py-2 text-right font-bold" style={{ color: '#0d47a1' }}>
+                    {mAbf != null ? mAbf.toFixed(3) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold" style={{ color: '#6a1b9a' }}>
+                    {l.abf_generated_total != null ? Number(l.abf_generated_total).toFixed(3) : '—'}
+                  </td>
+                  <td className="px-3 py-2">
+                    {l.commissioned_status ? (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-bold"
+                        style={{
+                          background: l.commissioned_status === 'Full' ? '#e8f5e9' : '#fff3e0',
+                          color: l.commissioned_status === 'Full' ? '#2e7d32' : '#e65100',
+                        }}
+                      >
+                        {l.commissioned_status}
+                      </span>
+                    ) : '—'}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          {/* Totals */}
+          <tfoot>
+            <tr className="border-t bg-slate-100 font-bold text-xs">
+              <td className="px-3 py-2" colSpan={6}>{leads.length} PO{leads.length !== 1 ? 's' : ''}</td>
+              <td className="px-3 py-2 text-right">
+                {leads.reduce((s, l) => s + (l.quantity ?? 0), 0).toLocaleString('en-IN')}
+              </td>
+              <td className="px-3 py-2 text-right">
+                {totalCommQty.toLocaleString('en-IN')}
+              </td>
+              <td className="px-3 py-2 text-right" style={{ color: '#0d47a1' }}>
+                {totalMonthly.toFixed(3)} Cr
+              </td>
+              <td className="px-3 py-2 text-right" style={{ color: '#6a1b9a' }}>
+                {totalAbfGen.toFixed(3)} Cr
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   )
 }

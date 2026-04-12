@@ -9,6 +9,12 @@ const categoryColors: Record<string, string> = {
   PSU:     '#2e7d32',
 }
 
+const verticalColors: Record<string, { bg: string; text: string }> = {
+  CM:  { bg: '#e3f2fd', text: '#0d47a1' },
+  EB:  { bg: '#e8f5e9', text: '#1b5e20' },
+  CFA: { bg: '#fce4ec', text: '#880e4f' },
+}
+
 type FunnelRow = {
   id: string
   customer_name: string
@@ -23,23 +29,30 @@ type FunnelRow = {
   stage_week1?: number | null
   remarks_current?: string | null
   // Stage 4
+  opp_id?: number | null
   po_value?: number | null
   po_date?: string | null
   contract_period?: number | null
   commissioned_qty?: number | null
   commissioned_status?: string | null
+  product_vertical?: string | null
+  annualized_value?: number | null
+  abf_generated_total?: number | null
+  billing_cycle?: string | null
 }
 
-// Generic dropdown filter derived from unique values in a column
+function monthlyAbf(r: FunnelRow): number | null {
+  if (!r.annualized_value) return null
+  const fraction = (r.quantity && r.commissioned_qty)
+    ? Math.min(r.commissioned_qty / r.quantity, 1)
+    : 1
+  return (r.annualized_value / 12) * fraction
+}
+
+// Generic dropdown filter
 function ColFilter({
-  options,
-  value,
-  onChange,
-}: {
-  options: string[]
-  value: string
-  onChange: (v: string) => void
-}) {
+  options, value, onChange,
+}: { options: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <select
       value={value}
@@ -48,21 +61,13 @@ function ColFilter({
       style={{ minWidth: 80 }}
     >
       <option value="">All</option>
-      {options.map(o => (
-        <option key={o} value={o}>{o}</option>
-      ))}
+      {options.map(o => <option key={o} value={o}>{o}</option>)}
     </select>
   )
 }
 
 // Text search filter
-function TextFilter({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (v: string) => void
-}) {
+function TextFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <input
       type="text"
@@ -75,35 +80,31 @@ function TextFilter({
   )
 }
 
-export function FunnelTable({
-  data,
-  stage,
-}: {
-  data: FunnelRow[]
-  stage: 1 | 4
-}) {
+export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }) {
   const [filters, setFilters] = useState({
     customer: '',
     nam: '',
     category: '',
     product: '',
     business_type: '',
-    status: '',     // stage 4 only
+    status: '',
+    vertical: '',
   })
 
   const set = (key: keyof typeof filters) => (v: string) =>
     setFilters(prev => ({ ...prev, [key]: v }))
 
-  // Unique option lists
   function uniq(arr: string[]) {
     return Array.from(new Set(arr)).sort()
   }
+
   const opts = useMemo(() => ({
     nam:           uniq(data.map(r => r.nam_name ?? '').filter(Boolean)),
     category:      uniq(data.map(r => r.main_category ?? '').filter(Boolean)),
     product:       uniq(data.map(r => r.product_name ?? '').filter(Boolean)),
     business_type: uniq(data.map(r => r.business_type ?? '').filter(Boolean)),
     status:        uniq(data.map(r => r.commissioned_status ?? '').filter(Boolean)),
+    vertical:      uniq(data.map(r => r.product_vertical ?? '').filter(Boolean)),
   }), [data])
 
   const filtered = useMemo(() => data.filter(r => {
@@ -113,22 +114,26 @@ export function FunnelTable({
     if (filters.product && r.product_name !== filters.product) return false
     if (filters.business_type && r.business_type !== filters.business_type) return false
     if (stage === 4 && filters.status && r.commissioned_status !== filters.status) return false
+    if (stage === 4 && filters.vertical && r.product_vertical !== filters.vertical) return false
     return true
   }), [data, filters, stage])
 
-  const totalValue = filtered.reduce((s, r) =>
-    s + (stage === 1 ? (r.base_tariff ?? 0) : (r.po_value ?? 0)), 0)
+  const totalValue    = filtered.reduce((s, r) => s + (stage === 1 ? (r.base_tariff ?? 0) : (r.po_value ?? 0)), 0)
+  const totalMonthly  = filtered.reduce((s, r) => s + (monthlyAbf(r) ?? 0), 0)
+  const totalAbfGen   = filtered.reduce((s, r) => s + (r.abf_generated_total ?? 0), 0)
+  const hasFilter     = Object.values(filters).some(Boolean)
 
-  const hasFilter = Object.values(filters).some(Boolean)
+  // Stage 4: number of extra columns beyond the shared ones
+  const stage4Cols = 7  // opp_id, PO Date, Contract, Vertical, Comm.Qty, Monthly ABF, ABF Gen
+  const stage1Cols = 4  // Commitment, Wk1, Business Type, Remarks
 
   return (
     <div className="space-y-3">
-      {/* Active filter count + clear */}
       {hasFilter && (
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <span>Showing <strong className="text-slate-800">{filtered.length}</strong> of {data.length} rows</span>
           <button
-            onClick={() => setFilters({ customer: '', nam: '', category: '', product: '', business_type: '', status: '' })}
+            onClick={() => setFilters({ customer: '', nam: '', category: '', product: '', business_type: '', status: '', vertical: '' })}
             className="px-2 py-0.5 rounded text-white text-xs font-medium"
             style={{ background: '#f57c00' }}
           >
@@ -141,32 +146,27 @@ export function FunnelTable({
         <table className="w-full text-sm whitespace-nowrap">
           <thead className="bg-slate-50 border-b">
             <tr>
-              {/* Customer */}
+              {/* Shared columns */}
               <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[160px]">
                 Customer
                 <TextFilter value={filters.customer} onChange={set('customer')} />
               </th>
-              {/* NAM */}
               <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[120px]">
                 NAM
                 <ColFilter options={opts.nam} value={filters.nam} onChange={set('nam')} />
               </th>
-              {/* Category */}
               <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[100px]">
                 Category
                 <ColFilter options={opts.category} value={filters.category} onChange={set('category')} />
               </th>
-              {/* Product */}
               <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[160px]">
                 Product
                 <ColFilter options={opts.product} value={filters.product} onChange={set('product')} />
               </th>
-              {/* Qty */}
               <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[80px]">
                 Qty
                 <div className="mt-1 h-[26px]" />
               </th>
-              {/* Value */}
               <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[100px]">
                 {stage === 1 ? 'Value (₹ Cr)' : 'PO Value (₹ Cr)'}
                 <div className="mt-1 h-[26px]" />
@@ -182,6 +182,10 @@ export function FunnelTable({
                     Stage Wk1
                     <div className="mt-1 h-[26px]" />
                   </th>
+                  <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[120px]">
+                    Business Type
+                    <ColFilter options={opts.business_type} value={filters.business_type} onChange={set('business_type')} />
+                  </th>
                   <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[180px]">
                     Current Remarks
                     <div className="mt-1 h-[26px]" />
@@ -189,16 +193,32 @@ export function FunnelTable({
                 </>
               ) : (
                 <>
+                  <th className="px-3 py-2 text-center font-semibold text-xs uppercase tracking-wide min-w-[80px]">
+                    Opp ID
+                    <div className="mt-1 h-[26px]" />
+                  </th>
                   <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[110px]">
                     PO Date
                     <div className="mt-1 h-[26px]" />
                   </th>
-                  <th className="px-3 py-2 text-center font-semibold text-xs uppercase tracking-wide min-w-[90px]">
+                  <th className="px-3 py-2 text-center font-semibold text-xs uppercase tracking-wide min-w-[80px]">
                     Contract (Y)
                     <div className="mt-1 h-[26px]" />
                   </th>
-                  <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[100px]">
+                  <th className="px-3 py-2 text-center font-semibold text-xs uppercase tracking-wide min-w-[80px]">
+                    Vertical
+                    <ColFilter options={opts.vertical} value={filters.vertical} onChange={set('vertical')} />
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[90px]">
                     Comm. Qty
+                    <div className="mt-1 h-[26px]" />
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[110px]">
+                    Monthly ABF (₹ Cr)
+                    <div className="mt-1 h-[26px]" />
+                  </th>
+                  <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[110px]">
+                    ABF Generated (₹ Cr)
                     <div className="mt-1 h-[26px]" />
                   </th>
                   <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[90px]">
@@ -207,95 +227,111 @@ export function FunnelTable({
                   </th>
                 </>
               )}
-
-              {/* Business Type */}
-              <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide min-w-[120px]">
-                Business Type
-                <ColFilter options={opts.business_type} value={filters.business_type} onChange={set('business_type')} />
-              </th>
             </tr>
           </thead>
 
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={stage === 1 ? 10 : 10} className="px-4 py-8 text-center text-slate-400 text-sm">
+                <td colSpan={stage === 1 ? 10 : 13} className="px-4 py-8 text-center text-slate-400 text-sm">
                   No records match the current filters.
                 </td>
               </tr>
             ) : (
-              filtered.map((r, i) => (
-                <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                  <td className="px-3 py-2 font-semibold text-slate-800 max-w-[200px] truncate" title={r.customer_name}>
-                    {r.customer_name}
-                  </td>
-                  <td className="px-3 py-2 text-slate-600">{r.nam_name ?? '—'}</td>
-                  <td className="px-3 py-2">
-                    <span
-                      className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
-                      style={{ background: categoryColors[r.main_category ?? ''] ?? '#9e9e9e' }}
-                    >
-                      {r.main_category ?? '—'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-600 max-w-[180px] truncate" title={r.product_name ?? ''}>
-                    {r.product_name ?? '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right font-medium">
-                    {r.quantity ? Number(r.quantity).toLocaleString('en-IN') : '—'}
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold" style={{ color: stage === 1 ? '#f57c00' : '#2e7d32' }}>
-                    {stage === 1
-                      ? (r.base_tariff != null ? Number(r.base_tariff).toFixed(2) : '—')
-                      : (r.po_value != null ? Number(r.po_value).toFixed(2) : '—')
-                    }
-                  </td>
+              filtered.map((r, i) => {
+                const mAbf = monthlyAbf(r)
+                const vc = verticalColors[r.product_vertical ?? '']
+                return (
+                  <tr key={r.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                    <td className="px-3 py-2 font-semibold text-slate-800 max-w-[200px] truncate" title={r.customer_name}>
+                      {r.customer_name}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">{r.nam_name ?? '—'}</td>
+                    <td className="px-3 py-2">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-white text-xs font-bold"
+                        style={{ background: categoryColors[r.main_category ?? ''] ?? '#9e9e9e' }}
+                      >
+                        {r.main_category ?? '—'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 max-w-[180px] truncate" title={r.product_name ?? ''}>
+                      {r.product_name ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      {r.quantity ? Number(r.quantity).toLocaleString('en-IN') : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold" style={{ color: stage === 1 ? '#f57c00' : '#2e7d32' }}>
+                      {stage === 1
+                        ? (r.base_tariff != null ? Number(r.base_tariff).toFixed(2) : '—')
+                        : (r.po_value != null ? Number(r.po_value).toFixed(2) : '—')
+                      }
+                    </td>
 
-                  {stage === 1 ? (
-                    <>
-                      <td className="px-3 py-2 text-center">
-                        {r.commitment != null ? (
-                          <span
-                            className="inline-flex w-6 h-6 rounded-full text-white text-xs font-bold items-center justify-center"
-                            style={{ background: '#2e7d32' }}
-                          >
-                            {r.commitment}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="px-3 py-2 text-center text-slate-500">{r.stage_week1 ?? '—'}</td>
-                      <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={r.remarks_current ?? ''}>
-                        {r.remarks_current ?? '—'}
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="px-3 py-2 text-slate-600">{r.po_date ?? '—'}</td>
-                      <td className="px-3 py-2 text-center">{r.contract_period ?? '—'}</td>
-                      <td className="px-3 py-2 text-right">
-                        {r.commissioned_qty ? Number(r.commissioned_qty).toLocaleString('en-IN') : '—'}
-                      </td>
-                      <td className="px-3 py-2">
-                        {r.commissioned_status ? (
-                          <Badge
-                            className="text-xs border-none"
-                            style={{
-                              background: r.commissioned_status === 'Full' ? '#e8f5e9' : '#fff3e0',
-                              color: r.commissioned_status === 'Full' ? '#2e7d32' : '#e65100',
-                            }}
-                          >
-                            {r.commissioned_status}
-                          </Badge>
-                        ) : '—'}
-                      </td>
-                    </>
-                  )}
-
-                  <td className="px-3 py-2">
-                    <Badge variant="outline" className="text-xs">{r.business_type ?? '—'}</Badge>
-                  </td>
-                </tr>
-              ))
+                    {stage === 1 ? (
+                      <>
+                        <td className="px-3 py-2 text-center">
+                          {r.commitment != null ? (
+                            <span
+                              className="inline-flex w-6 h-6 rounded-full text-white text-xs font-bold items-center justify-center"
+                              style={{ background: '#2e7d32' }}
+                            >
+                              {r.commitment}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-center text-slate-500">{r.stage_week1 ?? '—'}</td>
+                        <td className="px-3 py-2">
+                          <Badge variant="outline" className="text-xs">{r.business_type ?? '—'}</Badge>
+                        </td>
+                        <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={r.remarks_current ?? ''}>
+                          {r.remarks_current ?? '—'}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-3 py-2 text-center text-slate-500 font-mono text-xs">
+                          {r.opp_id ?? '—'}
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">{r.po_date ?? '—'}</td>
+                        <td className="px-3 py-2 text-center">{r.contract_period ?? '—'}</td>
+                        <td className="px-3 py-2 text-center">
+                          {r.product_vertical ? (
+                            <span
+                              className="px-2 py-0.5 rounded-full text-xs font-bold"
+                              style={vc ? { background: vc.bg, color: vc.text } : { background: '#f3f4f6', color: '#374151' }}
+                            >
+                              {r.product_vertical}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {r.commissioned_qty ? Number(r.commissioned_qty).toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold" style={{ color: '#0d47a1' }}>
+                          {mAbf != null ? mAbf.toFixed(3) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right font-bold" style={{ color: '#6a1b9a' }}>
+                          {r.abf_generated_total != null ? Number(r.abf_generated_total).toFixed(3) : '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          {r.commissioned_status ? (
+                            <Badge
+                              className="text-xs border-none"
+                              style={{
+                                background: r.commissioned_status === 'Full' ? '#e8f5e9' : '#fff3e0',
+                                color: r.commissioned_status === 'Full' ? '#2e7d32' : '#e65100',
+                              }}
+                            >
+                              {r.commissioned_status}
+                            </Badge>
+                          ) : '—'}
+                        </td>
+                      </>
+                    )}
+                  </tr>
+                )
+              })
             )}
           </tbody>
 
@@ -313,7 +349,24 @@ export function FunnelTable({
                 <td className="px-3 py-2 text-right" style={{ color: stage === 1 ? '#f57c00' : '#2e7d32' }}>
                   {totalValue.toFixed(2)} Cr
                 </td>
-                <td colSpan={stage === 1 ? 4 : 4} />
+                {stage === 1 ? (
+                  <td colSpan={stage1Cols} />
+                ) : (
+                  <>
+                    <td colSpan={3} /> {/* opp_id, po_date, contract */}
+                    <td className="px-3 py-2 text-center" /> {/* vertical */}
+                    <td className="px-3 py-2 text-right">
+                      {filtered.reduce((s, r) => s + (r.commissioned_qty ?? 0), 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-3 py-2 text-right" style={{ color: '#0d47a1' }}>
+                      {totalMonthly.toFixed(3)} Cr
+                    </td>
+                    <td className="px-3 py-2 text-right" style={{ color: '#6a1b9a' }}>
+                      {totalAbfGen.toFixed(3)} Cr
+                    </td>
+                    <td /> {/* status */}
+                  </>
+                )}
               </tr>
             </tfoot>
           )}
