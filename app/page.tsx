@@ -7,6 +7,7 @@ import { BillingTrendChart } from '@/components/billing-trend-chart'
 import { VerticalAbfChart } from '@/components/vertical-abf-chart'
 import { TopCustomersTable } from '@/components/top-customers-table'
 import { NamFunnelPanel } from '@/components/nam-funnel-panel'
+import { NamAbfChart } from '@/components/nam-abf-chart'
 
 // ── Section heading helper ────────────────────────────────────────────────
 function SectionHeading({ title, color }: { title: string; color: string }) {
@@ -18,16 +19,17 @@ function SectionHeading({ title, color }: { title: string; color: string }) {
   )
 }
 
-// ── Billing trend (ABF + Revenue, last 12 months) ─────────────────────────
+// ── Billing trend (ABF + Revenue + Efficiency, FY 2025-26 & FY 2026-27) ──
 async function BillingTrendData() {
   const supabase = getSupabase()
   const fromMonth = '2025-04'
+  const currentMonth = new Date().toISOString().slice(0, 7)
 
   const { data } = await supabase
     .from('monthly_records')
     .select('month, abf_amount, revenue_realised')
     .gte('month', fromMonth)
-    .lte('month', '2026-03')   // Apr 25 – Mar 26 billing year
+    .lte('month', currentMonth)
 
   const abfMap = new Map<string, number>()
   const revMap = new Map<string, number>()
@@ -83,6 +85,50 @@ async function VerticalAbfData() {
   return <VerticalAbfChart data={chartData} />
 }
 
+// ── NAM-wise ABF & Revenue — FY 2025-26 ──────────────────────────────────
+async function NamAbfData() {
+  const supabase = getSupabase()
+
+  const [
+    { data: records },
+    { data: customers },
+  ] = await Promise.all([
+    supabase
+      .from('monthly_records')
+      .select('customer_id, abf_amount, revenue_realised')
+      .gte('month', '2025-04')
+      .lte('month', '2026-03'),
+    supabase
+      .from('customers')
+      .select('id, nam_name'),
+  ])
+
+  const namMap = new Map<string, string>()
+  for (const c of customers ?? []) {
+    if (c.nam_name) namMap.set(c.id, c.nam_name)
+  }
+
+  const abfByNam = new Map<string, number>()
+  const revByNam = new Map<string, number>()
+  for (const r of records ?? []) {
+    const nam = namMap.get(r.customer_id)
+    if (!nam) continue
+    abfByNam.set(nam, (abfByNam.get(nam) ?? 0) + (r.abf_amount ?? 0))
+    revByNam.set(nam, (revByNam.get(nam) ?? 0) + (r.revenue_realised ?? 0))
+  }
+
+  const chartData = Array.from(abfByNam.keys())
+    .filter(nam => nam.trim() !== '')
+    .map(nam => ({
+      nam,
+      abf: abfByNam.get(nam) ?? 0,
+      revenue: revByNam.get(nam) ?? 0,
+    }))
+    .sort((a, b) => b.abf - a.abf)
+
+  return <NamAbfChart data={chartData} />
+}
+
 // ── Dashboard page ────────────────────────────────────────────────────────
 export default function DashboardPage() {
   return (
@@ -91,10 +137,17 @@ export default function DashboardPage() {
       {/* ── KPI Cards ── */}
       <Suspense
         fallback={
-          <div className="grid grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-24 rounded-lg bg-slate-100 animate-pulse" />
+              ))}
+            </div>
           </div>
         }
       >
@@ -103,9 +156,17 @@ export default function DashboardPage() {
 
       {/* ── Billing Trend ── */}
       <div>
-        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 (₹ Cr) · Historical" color="#f57c00" />
-        <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
+        <SectionHeading title="Monthly ABF & Revenue Collection — FY 2025-26 & FY 2026-27 (₹ Cr)" color="#f57c00" />
+        <Suspense fallback={<div className="h-72 rounded-lg bg-slate-100 animate-pulse" />}>
           <BillingTrendData />
+        </Suspense>
+      </div>
+
+      {/* ── NAM-wise ABF & Revenue ── */}
+      <div>
+        <SectionHeading title="NAM-wise ABF & Revenue — FY 2025-26 (₹ Cr)" color="#2e7d32" />
+        <Suspense fallback={<div className="h-64 rounded-lg bg-slate-100 animate-pulse" />}>
+          <NamAbfData />
         </Suspense>
       </div>
 

@@ -3,8 +3,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp, CheckCircle2, ClipboardList } from 'lucide-react'
+import {
+  LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp,
+  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight,
+} from 'lucide-react'
 
 const links = [
   { href: '/',               label: 'Dashboard',           icon: LayoutDashboard },
@@ -18,30 +22,49 @@ const links = [
 
 export function Nav() {
   const pathname = usePathname()
+  const [collapsed, setCollapsed] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('nav-collapsed')
+    if (stored === 'true') setCollapsed(true)
+  }, [])
+
+  function toggle() {
+    const next = !collapsed
+    setCollapsed(next)
+    localStorage.setItem('nav-collapsed', String(next))
+  }
 
   return (
     <aside
-      className="w-56 flex-shrink-0 flex flex-col min-h-screen sticky top-0"
+      className={cn(
+        'flex-shrink-0 flex flex-col min-h-screen sticky top-0 transition-all duration-200',
+        collapsed ? 'w-14' : 'w-56'
+      )}
       style={{ background: '#1565c0' }}
     >
       {/* ── Logo block ── */}
       <div
-        className="px-4 py-4 flex flex-col items-center"
+        className="px-2 py-4 flex flex-col items-center overflow-hidden"
         style={{ borderBottom: '1px solid rgba(255,255,255,0.25)' }}
       >
         <Image
           src="/bsnl-logo.png"
           alt="BSNL"
-          width={96}
-          height={96}
-          className="object-contain"
+          width={collapsed ? 32 : 72}
+          height={collapsed ? 32 : 72}
+          className="object-contain transition-all duration-200"
           priority
         />
-        <p className="text-white/80 text-[10px] tracking-wide mt-1">Bharat Sanchar Nigam</p>
+        {!collapsed && (
+          <p className="text-white/80 text-[10px] tracking-wide mt-1 whitespace-nowrap">
+            Bharat Sanchar Nigam
+          </p>
+        )}
       </div>
 
       {/* ── Navigation items ── */}
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-2 py-4 space-y-1">
         {links.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href || (href !== '/' && pathname.startsWith(href))
@@ -49,28 +72,45 @@ export function Nav() {
             <Link
               key={href}
               href={href}
+              title={collapsed ? label : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors',
+                'flex items-center gap-3 px-2 py-2.5 rounded-lg text-sm font-semibold transition-colors',
+                collapsed ? 'justify-center' : 'px-3',
                 active
                   ? 'bg-white text-[#1565c0] shadow-sm'
                   : 'text-white hover:bg-white/20'
               )}
             >
               <Icon className="w-4 h-4 shrink-0" />
-              {label}
+              {!collapsed && <span className="truncate">{label}</span>}
             </Link>
           )
         })}
       </nav>
 
       {/* ── Footer tag ── */}
-      <div
-        className="px-5 py-3"
+      {!collapsed && (
+        <div
+          className="px-5 py-3"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.25)' }}
+        >
+          <p className="text-white/60 text-[11px] font-medium">BUSINESS ANALYTICS PORTAL</p>
+          <p className="text-white/40 text-[10px]">Billing &amp; Activation Tracker</p>
+        </div>
+      )}
+
+      {/* ── Toggle button ── */}
+      <button
+        onClick={toggle}
+        className="flex items-center justify-center py-3 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
         style={{ borderTop: '1px solid rgba(255,255,255,0.25)' }}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
-        <p className="text-white/60 text-[11px] font-medium">BUSINESS ANALYTICS PORTAL</p>
-        <p className="text-white/40 text-[10px]">Billing &amp; Activation Tracker</p>
-      </div>
+        {collapsed
+          ? <ChevronRight className="w-4 h-4" />
+          : <ChevronLeft className="w-4 h-4" />
+        }
+      </button>
     </aside>
   )
 }
