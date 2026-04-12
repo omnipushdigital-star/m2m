@@ -68,7 +68,7 @@ export function Nav() {
         className="px-5 py-3"
         style={{ borderTop: '1px solid rgba(255,255,255,0.25)' }}
       >
-        <p className="text-white/60 text-[11px] font-medium">M2M / IoT SIM Inventory</p>
+        <p className="text-white/60 text-[11px] font-medium">BUSINESS ANALYTICS PORTAL</p>
         <p className="text-white/40 text-[10px]">Billing &amp; Activation Tracker</p>
       </div>
     </aside>

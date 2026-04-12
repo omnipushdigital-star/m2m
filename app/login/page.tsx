@@ -42,7 +42,7 @@ export default function LoginPage() {
           <div className="px-8 py-6 flex flex-col items-center" style={{ background: '#1565c0' }}>
             <Image src="/bsnl-logo.png" alt="BSNL" width={80} height={80} className="object-contain" priority />
             <h1 className="text-white font-extrabold text-lg tracking-wide mt-2">EB PLATINUM UNIT GURGAON</h1>
-            <p className="text-white/70 text-xs tracking-widest mt-0.5">M2M / IoT SIM Inventory</p>
+            <p className="text-white/70 text-xs tracking-widest mt-0.5">BUSINESS ANALYTICS PORTAL</p>
           </div>
 
           {/* Form */}

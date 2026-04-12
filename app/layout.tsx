@@ -56,7 +56,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 className="inline-block px-3 py-1 rounded-full text-xs font-bold text-white"
                 style={{ background: '#f57c00' }}
               >
-                M2M / IoT SIM Inventory
+                BUSINESS ANALYTICS PORTAL
               </span>
 
               <HeaderUser
