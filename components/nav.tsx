@@ -7,11 +7,12 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp,
-  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X,
+  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X, Target,
 } from 'lucide-react'
 
 const links = [
   { href: '/',               label: 'Dashboard',           icon: LayoutDashboard },
+  { href: '/kpi',            label: 'KPI Tracker',         icon: Target },
   { href: '/customers',      label: 'Customers',           icon: Users },
   { href: '/reports',        label: 'Reports',             icon: FileBarChart2 },
   { href: '/plans',          label: 'Plans',               icon: Layers },
