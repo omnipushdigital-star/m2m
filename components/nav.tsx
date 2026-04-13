@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp,
-  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X, Target,
+  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X, Target, Wifi,
 } from 'lucide-react'
 
 const links = [
@@ -19,6 +19,7 @@ const links = [
   { href: '/funnel/stage1',  label: 'Stage 1 — Pipeline',  icon: TrendingUp },
   { href: '/funnel/stage4',  label: 'Stage 4 — PO Closed', icon: CheckCircle2 },
   { href: '/ltb',            label: 'Lead to Bill',        icon: ClipboardList },
+  { href: '/sim-upload',    label: 'SIM Inventory',       icon: Wifi },
 ]
 
 // ── Desktop collapsible sidebar ──────────────────────────────────────────────
