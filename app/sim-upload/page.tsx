@@ -1,12 +1,15 @@
+import { redirect } from 'next/navigation'
 import { getSupabase } from '@/lib/supabase'
+import { getRole } from '@/lib/supabase-server'
 import { SimUploadClient } from '@/components/sim-upload-client'
 
 export const dynamic = 'force-dynamic'
 
 export default async function SimUploadPage() {
-  const supabase = getSupabase()
+  const role = await getRole()
+  if (role !== 'admin') redirect('/')
 
-  // Fetch all customers for fuzzy matching (id + name only)
+  const supabase = getSupabase()
   const { data: customers } = await supabase
     .from('customers')
     .select('id, name')
@@ -21,7 +24,6 @@ export default async function SimUploadPage() {
           New SIMs are activated, missing SIMs are marked deactivated, and plan/APN changes are tracked.
         </p>
       </div>
-
       <SimUploadClient customers={customers ?? []} />
     </div>
   )

@@ -15,7 +15,7 @@ type Customer = { id: string; name: string }
 type CustomerSummary = {
   customer_name_raw: string
   customer_id:       string | null
-  match_status:      'matched' | 'pending'
+  match_status:      'matched' | 'pending' | 'other_unit'
   total_sims:        number
   by_plan:           Record<string, number>
   by_apn:            Record<string, number>
@@ -236,12 +236,16 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
     }
   }
 
-  async function handleResolve(raw: string, customerId: string) {
+  async function handleResolve(raw: string, value: string) {
     setResolving(raw)
     try {
       const supabase = getSupabase()
+      const isOther = value === '__other_unit__'
       await supabase.from('sim_customer_summary')
-        .update({ customer_id: customerId, match_status: 'matched' })
+        .update({
+          customer_id:  isOther ? null : value,
+          match_status: isOther ? 'other_unit' : 'matched',
+        })
         .eq('customer_name_raw', raw)
       setResolved(prev => new Set([...Array.from(prev), raw]))
     } finally { setResolving(null) }
@@ -374,6 +378,8 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
                       <td className="py-1.5">
                         {isResolved || a.match_status === 'matched'
                           ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Matched</span>
+                          : a.match_status === 'other_unit'
+                          ? <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">Other Unit</span>
                           : <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Review</span>}
                       </td>
                     </tr>
@@ -442,11 +448,14 @@ function ProgressBar({ icon, label, pct, color }: { icon: React.ReactNode; label
 }
 
 // ── Match row ─────────────────────────────────────────────────────────────────
+const OTHER_UNIT = '__other_unit__'
+
 function MatchRow({ nameRaw, totalSims, customers, resolving, onResolve }: {
   nameRaw: string; totalSims: number; customers: Customer[]
   resolving: boolean; onResolve: (id: string) => void
 }) {
   const [selected, setSelected] = useState('')
+  const isOtherUnit = selected === OTHER_UNIT
   return (
     <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
@@ -455,15 +464,21 @@ function MatchRow({ nameRaw, totalSims, customers, resolving, onResolve }: {
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <select value={selected} onChange={e => setSelected(e.target.value)}
-          className="text-xs border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px]">
-          <option value="">— select customer —</option>
+          className="text-xs border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[220px]">
+          <option value="">— select —</option>
+          <option value={OTHER_UNIT}>⚡ Other Unit (Not Gurgaon)</option>
+          <option disabled>──────────────</option>
           {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <button onClick={() => onResolve(selected)} disabled={!selected || resolving}
           className={cn('flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold transition-colors',
-            selected && !resolving ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-100 text-slate-400 cursor-not-allowed')}>
+            selected && !resolving
+              ? isOtherUnit
+                ? 'bg-slate-500 text-white hover:bg-slate-600'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed')}>
           {resolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
-          Confirm
+          {isOtherUnit ? 'Dismiss' : 'Confirm'}
         </button>
       </div>
     </div>

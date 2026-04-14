@@ -32,7 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={cn(inter.className, 'flex min-h-screen bg-[#f8f9fc]')}>
 
         {/* ── Sidebar ── */}
-        <Nav />
+        <Nav isAdmin={role === 'admin'} />
 
         {/* ── Right panel ── */}
         <div className="flex flex-col flex-1 overflow-x-hidden">
@@ -43,7 +43,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             style={{ background: '#1565c0' }}
           >
             {/* Mobile hamburger */}
-            <MobileNav />
+            <MobileNav isAdmin={role === 'admin'} />
 
             {/* Title */}
             <div className="flex flex-col leading-none min-w-0">

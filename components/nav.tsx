@@ -11,19 +11,19 @@ import {
 } from 'lucide-react'
 
 const links = [
-  { href: '/',               label: 'Dashboard',           icon: LayoutDashboard },
-  { href: '/kpi',            label: 'KPI Tracker',         icon: Target },
-  { href: '/customers',      label: 'Customers',           icon: Users },
-  { href: '/reports',        label: 'Reports',             icon: FileBarChart2 },
-  { href: '/plans',          label: 'Plans',               icon: Layers },
-  { href: '/funnel/stage1',  label: 'Stage 1 — Pipeline',  icon: TrendingUp },
-  { href: '/funnel/stage4',  label: 'Stage 4 — PO Closed', icon: CheckCircle2 },
-  { href: '/ltb',            label: 'Lead to Bill',        icon: ClipboardList },
-  { href: '/sim-upload',    label: 'SIM Inventory',       icon: Wifi },
+  { href: '/',              label: 'Dashboard',           icon: LayoutDashboard, adminOnly: false },
+  { href: '/kpi',           label: 'KPI Tracker',         icon: Target,          adminOnly: false },
+  { href: '/customers',     label: 'Customers',           icon: Users,           adminOnly: false },
+  { href: '/reports',       label: 'Reports',             icon: FileBarChart2,   adminOnly: false },
+  { href: '/plans',         label: 'Plans',               icon: Layers,          adminOnly: false },
+  { href: '/funnel/stage1', label: 'Stage 1 — Pipeline',  icon: TrendingUp,      adminOnly: false },
+  { href: '/funnel/stage4', label: 'Stage 4 — PO Closed', icon: CheckCircle2,    adminOnly: false },
+  { href: '/ltb',           label: 'Lead to Bill',        icon: ClipboardList,   adminOnly: false },
+  { href: '/sim-upload',    label: 'SIM Inventory',       icon: Wifi,            adminOnly: true  },
 ]
 
 // ── Desktop collapsible sidebar ──────────────────────────────────────────────
-export function Nav() {
+export function Nav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
 
@@ -68,7 +68,7 @@ export function Nav() {
 
       {/* Nav items */}
       <nav className="flex-1 px-2 py-4 space-y-1">
-        {links.map(({ href, label, icon: Icon }) => {
+        {links.filter(l => !l.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => {
           const active = pathname === href || (href !== '/' && pathname.startsWith(href))
           return (
             <Link
@@ -110,7 +110,7 @@ export function Nav() {
 }
 
 // ── Mobile hamburger + slide-in drawer ───────────────────────────────────────
-export function MobileNav() {
+export function MobileNav({ isAdmin = false }: { isAdmin?: boolean }) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
@@ -170,7 +170,7 @@ export function MobileNav() {
 
             {/* Nav items */}
             <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-              {links.map(({ href, label, icon: Icon }) => {
+              {links.filter(l => !l.adminOnly || isAdmin).map(({ href, label, icon: Icon }) => {
                 const active = pathname === href || (href !== '/' && pathname.startsWith(href))
                 return (
                   <Link
