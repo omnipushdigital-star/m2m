@@ -5,42 +5,30 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   try {
-    const { imsi, customerId, cafNo, customerNameRaw, saveMapping } = await req.json() as {
-      imsi: string
-      customerId: string
-      cafNo?: string
-      customerNameRaw?: string
-      saveMapping?: boolean  // persist to customer_caf_mapping so future uploads auto-match
+    const { customerNameRaw, customerId } = await req.json() as {
+      customerNameRaw: string
+      customerId:      string
     }
 
-    if (!imsi || !customerId) {
-      return NextResponse.json({ error: 'Missing imsi or customerId' }, { status: 400 })
+    if (!customerNameRaw || !customerId) {
+      return NextResponse.json({ error: 'Missing customerNameRaw or customerId' }, { status: 400 })
     }
 
     const supabase = getSupabase()
 
-    // Update the SIM inventory record
-    const { error: updateError } = await supabase
-      .from('sim_inventory')
-      .update({
-        customer_id: customerId,
-        match_status: 'matched',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('imsi', imsi)
+    // Update all summary rows for this raw name to matched
+    const { error } = await supabase
+      .from('sim_customer_summary')
+      .update({ customer_id: customerId, match_status: 'matched', updated_at: new Date().toISOString() })
+      .eq('customer_name_raw', customerNameRaw)
 
-    if (updateError) throw updateError
+    if (error) throw error
 
-    // Optionally persist the CAF mapping so future uploads auto-match
-    if (saveMapping && cafNo && customerNameRaw) {
-      const { error: mappingError } = await supabase
-        .from('customer_caf_mapping')
-        .upsert(
-          { caf_no: cafNo, customer_name_raw: customerNameRaw, customer_id: customerId },
-          { onConflict: 'caf_no,customer_name_raw' }
-        )
-      if (mappingError) console.error('CAF mapping save error:', mappingError)
-    }
+    // Also update change log
+    await supabase
+      .from('sim_change_log')
+      .update({ customer_id: customerId })
+      .eq('customer_name_raw', customerNameRaw)
 
     return NextResponse.json({ ok: true })
   } catch (e) {

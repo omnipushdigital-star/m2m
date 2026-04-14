@@ -6,233 +6,209 @@ import {
   Loader2, FileText, ChevronDown, ChevronUp, Search,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { jaccardScore, normalizeName } from '@/lib/fuzzy-match'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Customer = { id: string; name: string }
 
-type SimRow = {
-  external_id: string
-  caf_no: string
-  imsi: string
-  sim_no: string
+type CustomerAgg = {
   customer_name_raw: string
-  service_center: string
-  plan: string
-  apn: string
+  customer_id:       string | null
+  match_status:      'matched' | 'pending'
+  total_sims:        number
+  by_plan:           Record<string, number>
+  by_apn:            Record<string, number>
+  by_service_center: Record<string, number>
 }
 
 type UploadSummary = {
-  new: number
-  changed: number
-  unchanged: number
-  deleted: number
-  pending: number
-  total: number
+  customers:  number
+  totalSims:  number
+  pending:    number
 }
 
-type PendingMatch = {
-  imsi: string
-  caf_no: string
-  customer_name_raw: string
-  suggestedId: string | null
-  suggestedName: string | null
-  resolved: boolean
-}
+// ── Column positions (0-indexed) ──────────────────────────────────────────────
+const COL = { external_id: 0, caf_no: 1, imsi: 2, sim_no: 3, customer_name: 4, service_center: 5, plan: 6, apn: 7 }
 
-// ── Column mapping (0-indexed positions in each file row) ─────────────────────
-// Expected columns: external_id, caf_no, imsi, sim_no, customer_name_raw, service_center, plan, apn
-const COL_MAP = {
-  external_id:       0,
-  caf_no:            1,
-  imsi:              2,
-  sim_no:            3,
-  customer_name_raw: 4,
-  service_center:    5,
-  plan:              6,
-  apn:               7,
-}
+const STREAM_CHUNK = 8 * 1024 * 1024   // 8 MB slices for streaming
+const FUZZY_THRESHOLD = 0.5
 
-const CHUNK_SIZE = 2000
-const PARALLEL_CHUNKS = 5
-
-// ── Parse raw text file ───────────────────────────────────────────────────────
-function parseSimFile(text: string): SimRow[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim())
-  if (lines.length === 0) return []
-
-  // Auto-detect delimiter from first line
-  const firstLine = lines[0]
-  const tabCount   = (firstLine.match(/\t/g) ?? []).length
-  const commaCount = (firstLine.match(/,/g)  ?? []).length
-  const delim = tabCount >= commaCount ? '\t' : ','
-
-  // Skip header row if first cell looks like a label (not a number / not all digits)
-  const startIdx = isNaN(Number(firstLine.split(delim)[0].trim())) ? 1 : 0
-
-  const rows: SimRow[] = []
-  for (let i = startIdx; i < lines.length; i++) {
-    const cols = lines[i].split(delim)
-    if (cols.length < 8) continue
-    const imsi = cols[COL_MAP.imsi]?.trim()
-    if (!imsi) continue
-    rows.push({
-      external_id:       cols[COL_MAP.external_id]?.trim()       ?? '',
-      caf_no:            cols[COL_MAP.caf_no]?.trim()            ?? '',
-      imsi,
-      sim_no:            cols[COL_MAP.sim_no]?.trim()            ?? '',
-      customer_name_raw: cols[COL_MAP.customer_name_raw]?.trim() ?? '',
-      service_center:    cols[COL_MAP.service_center]?.trim()    ?? '',
-      plan:              cols[COL_MAP.plan]?.trim()              ?? '',
-      apn:               cols[COL_MAP.apn]?.trim()               ?? '',
-    })
+// ── Stream-parse the file in 8 MB slices ─────────────────────────────────────
+// Yields arrays of complete lines, carries partial lines between slices.
+async function* streamLines(file: File): AsyncGenerator<string[]> {
+  let offset  = 0
+  let leftover = ''
+  while (offset < file.size) {
+    const slice = file.slice(offset, offset + STREAM_CHUNK)
+    const text  = await slice.text()
+    const combined = leftover + text
+    const lines    = combined.split(/\r?\n/)
+    leftover = lines.pop() ?? ''
+    yield lines.filter(l => l.trim())
+    offset += STREAM_CHUNK
   }
-  return rows
+  if (leftover.trim()) yield [leftover]
 }
 
-// ── Send chunks with concurrency limit ───────────────────────────────────────
-async function sendChunks(
-  sims: SimRow[],
-  uploadMonth: string,
-  customers: Customer[],
-  onProgress: (done: number, total: number) => void,
-): Promise<{ new: number; changed: number; unchanged: number }> {
-  const chunks: SimRow[][] = []
-  for (let i = 0; i < sims.length; i += CHUNK_SIZE) {
-    chunks.push(sims.slice(i, i + CHUNK_SIZE))
-  }
+// ── Auto-detect delimiter ─────────────────────────────────────────────────────
+function detectDelim(line: string): string {
+  return (line.match(/\t/g)?.length ?? 0) >= (line.match(/,/g)?.length ?? 0) ? '\t' : ','
+}
 
-  let done = 0
-  let totalNew = 0, totalChanged = 0, totalUnchanged = 0
+// ── Build per-customer aggregates from the entire file ────────────────────────
+async function aggregateFile(
+  file:        File,
+  customers:   Customer[],
+  onProgress:  (bytesRead: number, totalBytes: number) => void,
+): Promise<CustomerAgg[]> {
+  const custTokens = customers.map(c => ({ id: c.id, name: c.name, tokens: normalizeName(c.name) }))
+  const matchCache = new Map<string, { id: string | null; status: 'matched' | 'pending' }>()
 
-  // Process in windows of PARALLEL_CHUNKS
-  for (let i = 0; i < chunks.length; i += PARALLEL_CHUNKS) {
-    const window = chunks.slice(i, i + PARALLEL_CHUNKS)
-    const results = await Promise.all(
-      window.map(chunk =>
-        fetch('/api/sim-upload/chunk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sims: chunk, uploadMonth, customers }),
-        }).then(r => r.json())
-      )
-    )
-    for (const r of results) {
-      if (r.error) throw new Error(r.error)
-      totalNew       += r.new       ?? 0
-      totalChanged   += r.changed   ?? 0
-      totalUnchanged += r.unchanged ?? 0
-      done++
-      onProgress(done, chunks.length)
+  function matchName(raw: string): { id: string | null; status: 'matched' | 'pending' } {
+    if (matchCache.has(raw)) return matchCache.get(raw)!
+    const tokens = normalizeName(raw)
+    let bestId = null as string | null
+    let bestScore = 0
+    for (const c of custTokens) {
+      const s = jaccardScore(tokens, c.tokens)
+      if (s > bestScore) { bestScore = s; bestId = c.id }
     }
+    const result = bestScore >= FUZZY_THRESHOLD
+      ? { id: bestId, status: 'matched' as const }
+      : { id: null,   status: 'pending' as const }
+    matchCache.set(raw, result)
+    return result
   }
 
-  return { new: totalNew, changed: totalChanged, unchanged: totalUnchanged }
+  const aggMap = new Map<string, CustomerAgg>()
+  let delim   = ''
+  let isFirst = true
+  let bytesRead = 0
+
+  for await (const lines of streamLines(file)) {
+    for (const line of lines) {
+      if (isFirst) {
+        delim   = detectDelim(line)
+        isFirst = false
+        // Skip header if first column is not numeric
+        const firstCell = line.split(delim)[0].trim()
+        if (isNaN(Number(firstCell))) continue
+      }
+
+      const cols = line.split(delim)
+      if (cols.length < 8) continue
+
+      const imsi            = cols[COL.imsi]?.trim()
+      const customerNameRaw = cols[COL.customer_name]?.trim() ?? ''
+      const plan            = cols[COL.plan]?.trim()  ?? 'Unknown'
+      const apn             = cols[COL.apn]?.trim()   ?? 'Unknown'
+      const sc              = cols[COL.service_center]?.trim() ?? 'Unknown'
+
+      if (!imsi || !customerNameRaw) continue
+
+      if (!aggMap.has(customerNameRaw)) {
+        const { id, status } = matchName(customerNameRaw)
+        aggMap.set(customerNameRaw, {
+          customer_name_raw: customerNameRaw,
+          customer_id:       id,
+          match_status:      status,
+          total_sims:        0,
+          by_plan:           {},
+          by_apn:            {},
+          by_service_center: {},
+        })
+      }
+
+      const agg = aggMap.get(customerNameRaw)!
+      agg.total_sims++
+      agg.by_plan[plan]  = (agg.by_plan[plan]  ?? 0) + 1
+      agg.by_apn[apn]    = (agg.by_apn[apn]    ?? 0) + 1
+      agg.by_service_center[sc] = (agg.by_service_center[sc] ?? 0) + 1
+    }
+    bytesRead = Math.min(bytesRead + STREAM_CHUNK, file.size)
+    onProgress(bytesRead, file.size)
+  }
+
+  return Array.from(aggMap.values()).sort((a, b) => b.total_sims - a.total_sims)
 }
 
-// ── Fetch pending matches after upload ───────────────────────────────────────
-async function fetchPendingMatches(customers: Customer[]): Promise<PendingMatch[]> {
-  const res = await fetch('/api/sim-upload/pending-matches')
-  if (!res.ok) return []
-  const data = await res.json() as Array<{
-    imsi: string; caf_no: string; customer_name_raw: string; customer_id: string | null
-  }>
-
-  // Build customer name map for display
-  const custMap = new Map(customers.map(c => [c.id, c.name]))
-
-  return data.map(r => ({
-    imsi:              r.imsi,
-    caf_no:            r.caf_no,
-    customer_name_raw: r.customer_name_raw,
-    suggestedId:       r.customer_id,
-    suggestedName:     r.customer_id ? (custMap.get(r.customer_id) ?? null) : null,
-    resolved:          false,
-  }))
+// ── Resolve a pending match ───────────────────────────────────────────────────
+async function resolveMatch(customerNameRaw: string, customerId: string) {
+  await fetch('/api/sim-upload/resolve-match', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ customerNameRaw, customerId }),
+  })
 }
 
 // ── SIM Upload Client ─────────────────────────────────────────────────────────
 export function SimUploadClient({ customers }: { customers: Customer[] }) {
-  const [dragOver,     setDragOver]     = useState(false)
-  const [file,         setFile]         = useState<File | null>(null)
-  const [uploadMonth,  setUploadMonth]  = useState(() => {
+  const [dragOver,    setDragOver]    = useState(false)
+  const [file,        setFile]        = useState<File | null>(null)
+  const [uploadMonth, setUploadMonth] = useState(() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
   })
-  const [phase,        setPhase]        = useState<'idle' | 'parsing' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle')
-  const [progress,     setProgress]     = useState({ done: 0, total: 0 })
-  const [summary,      setSummary]      = useState<UploadSummary | null>(null)
-  const [errorMsg,     setErrorMsg]     = useState('')
-  const [pending,      setPending]      = useState<PendingMatch[]>([])
-  const [showPending,  setShowPending]  = useState(true)
-  const [matchSearch,  setMatchSearch]  = useState('')
+  const [phase,       setPhase]       = useState<'idle' | 'parsing' | 'uploading' | 'done' | 'error'>('idle')
+  const [progress,    setProgress]    = useState(0)   // 0–100
+  const [summary,     setSummary]     = useState<UploadSummary | null>(null)
+  const [aggregates,  setAggregates]  = useState<CustomerAgg[]>([])
+  const [errorMsg,    setErrorMsg]    = useState('')
+  const [showPending, setShowPending] = useState(true)
+  const [matchSearch, setMatchSearch] = useState('')
+  const [resolved,    setResolved]    = useState<Set<string>>(new Set())
+  const [resolving,   setResolving]   = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // ── File selection ──────────────────────────────────────────────────────────
   const handleFile = useCallback((f: File) => {
     setFile(f)
     setPhase('idle')
     setSummary(null)
+    setAggregates([])
     setErrorMsg('')
-    setPending([])
+    setResolved(new Set())
   }, [])
 
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault()
-    setDragOver(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
-  }
-
-  // ── Upload flow ─────────────────────────────────────────────────────────────
   async function startUpload() {
     if (!file || !uploadMonth) return
     setErrorMsg('')
     setSummary(null)
-    setPending([])
+    setAggregates([])
+    setResolved(new Set())
 
     try {
-      // 1. Parse file in browser
+      // 1. Stream-parse and aggregate in browser
       setPhase('parsing')
-      const text = await file.text()
-      const sims = parseSimFile(text)
-      if (sims.length === 0) {
-        setErrorMsg('No valid SIM rows found in file. Check column format.')
+      setProgress(0)
+      const aggs = await aggregateFile(
+        file, customers,
+        (done, total) => setProgress(Math.round((done / total) * 80)),
+      )
+
+      if (aggs.length === 0) {
+        setErrorMsg('No valid SIM rows found. Check file format (8 columns, tab or comma delimited).')
         setPhase('error')
         return
       }
 
-      // 2. Send chunks to API
+      setAggregates(aggs)
+
+      // 2. Send summaries to API (single call, ~38 rows)
       setPhase('uploading')
-      setProgress({ done: 0, total: Math.ceil(sims.length / CHUNK_SIZE) })
+      setProgress(85)
 
-      const chunkResult = await sendChunks(
-        sims, uploadMonth, customers,
-        (done, total) => setProgress({ done, total }),
-      )
-
-      // 3. Finalize (mark deletions)
-      setPhase('finalizing')
-      const finRes = await fetch('/api/sim-upload/finalize', {
-        method: 'POST',
+      const res = await fetch('/api/sim-upload/summary', {
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uploadMonth }),
+        body:    JSON.stringify({ summaries: aggs, uploadMonth }),
       })
-      const finData = await finRes.json()
-      if (finData.error) throw new Error(finData.error)
 
-      // 4. Fetch pending matches
-      const pendingMatches = await fetchPendingMatches(customers)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
 
-      setSummary({
-        new:       chunkResult.new,
-        changed:   chunkResult.changed,
-        unchanged: chunkResult.unchanged,
-        deleted:   finData.deleted ?? 0,
-        pending:   pendingMatches.length,
-        total:     sims.length,
-      })
-      setPending(pendingMatches)
+      setProgress(100)
+      setSummary({ customers: data.customers, totalSims: data.totalSims, pending: data.pending })
       setPhase('done')
 
     } catch (e) {
@@ -241,48 +217,39 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
     }
   }
 
-  // ── Resolve a pending match ─────────────────────────────────────────────────
-  async function resolveMatch(idx: number, customerId: string, saveMapping: boolean) {
-    const m = pending[idx]
-    const res = await fetch('/api/sim-upload/resolve-match', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        imsi:            m.imsi,
-        customerId,
-        cafNo:           m.caf_no,
-        customerNameRaw: m.customer_name_raw,
-        saveMapping,
-      }),
-    })
-    if (res.ok) {
-      setPending(prev => prev.map((p, i) => i === idx ? { ...p, resolved: true } : p))
+  async function handleResolve(customerNameRaw: string, customerId: string) {
+    setResolving(customerNameRaw)
+    try {
+      await resolveMatch(customerNameRaw, customerId)
+
+      // Also update summary row in DB
+      await fetch('/api/sim-upload/summary', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          summaries: aggregates
+            .filter(a => a.customer_name_raw === customerNameRaw)
+            .map(a => ({ ...a, customer_id: customerId, match_status: 'matched' as const })),
+          uploadMonth,
+        }),
+      })
+
+      setResolved(prev => new Set([...Array.from(prev), customerNameRaw]))
+    } finally {
+      setResolving(null)
     }
   }
 
-  // ── Filtered pending list ───────────────────────────────────────────────────
-  const filteredPending = pending.filter(p => {
-    if (!matchSearch) return !p.resolved
-    const q = matchSearch.toLowerCase()
-    return !p.resolved && (
-      p.customer_name_raw.toLowerCase().includes(q) ||
-      p.caf_no.toLowerCase().includes(q)
-    )
-  })
-
-  const resolvedCount = pending.filter(p => p.resolved).length
-
-  // ── Progress % ─────────────────────────────────────────────────────────────
-  const progressPct = progress.total > 0
-    ? Math.round((progress.done / progress.total) * 100)
-    : 0
-
-  const isRunning = phase === 'parsing' || phase === 'uploading' || phase === 'finalizing'
+  const isRunning = phase === 'parsing' || phase === 'uploading'
+  const pending   = aggregates.filter(a => a.match_status === 'pending' && !resolved.has(a.customer_name_raw))
+  const filtered  = matchSearch
+    ? pending.filter(a => a.customer_name_raw.toLowerCase().includes(matchSearch.toLowerCase()))
+    : pending
 
   return (
     <div className="space-y-6">
 
-      {/* ── Step 1: Pick month ────────────────────────────────────────────── */}
+      {/* ── Step 1: Month ─────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border p-5">
         <h2 className="text-sm font-bold text-slate-700 mb-3">1. Select Upload Month</h2>
         <input
@@ -292,21 +259,21 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
           className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           disabled={isRunning}
         />
-        <p className="text-xs text-slate-400 mt-1">This should match the month the SIM dump was exported.</p>
+        <p className="text-xs text-slate-400 mt-1">Month the SIM dump was exported.</p>
       </div>
 
-      {/* ── Step 2: Drop file ─────────────────────────────────────────────── */}
+      {/* ── Step 2: File ──────────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border p-5">
         <h2 className="text-sm font-bold text-slate-700 mb-3">2. Upload SIM File</h2>
         <div
           className={cn(
             'border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors',
-            dragOver ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300',
+            dragOver     ? 'border-blue-400 bg-blue-50' : 'border-slate-200 hover:border-slate-300',
             isRunning && 'pointer-events-none opacity-60',
           )}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
-          onDrop={onDrop}
+          onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
           onClick={() => fileInputRef.current?.click()}
         >
           <input
@@ -320,7 +287,7 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
             <div className="flex flex-col items-center gap-2">
               <FileText className="w-8 h-8 text-blue-500" />
               <p className="font-semibold text-slate-700">{file.name}</p>
-              <p className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(2)} MB — click to replace</p>
+              <p className="text-xs text-slate-400">{(file.size / 1024 / 1024).toFixed(1)} MB — click to replace</p>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2">
@@ -332,10 +299,9 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
         </div>
       </div>
 
-      {/* ── Step 3: Upload button + progress ─────────────────────────────── */}
+      {/* ── Step 3: Process ───────────────────────────────────────────────── */}
       <div className="bg-white rounded-xl border p-5 space-y-4">
         <h2 className="text-sm font-bold text-slate-700">3. Process Upload</h2>
-
         <button
           onClick={startUpload}
           disabled={!file || !uploadMonth || isRunning}
@@ -343,37 +309,35 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
             'flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold text-sm transition-colors',
             file && uploadMonth && !isRunning
               ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed',
           )}
         >
           {isRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-          {isRunning ? (
-            phase === 'parsing'    ? 'Parsing file…'    :
-            phase === 'uploading'  ? 'Uploading chunks…' :
-            phase === 'finalizing' ? 'Finalizing…'       : 'Processing…'
-          ) : 'Start Upload'}
+          {isRunning
+            ? phase === 'parsing'   ? 'Parsing file…' : 'Saving to database…'
+            : 'Start Upload'}
         </button>
 
-        {/* Progress bar */}
-        {phase === 'uploading' && (
+        {isRunning && (
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-slate-500">
-              <span>Chunk {progress.done} of {progress.total}</span>
-              <span>{progressPct}%</span>
+              <span>{phase === 'parsing' ? 'Reading & aggregating SIM file…' : 'Saving summaries…'}</span>
+              <span>{progress}%</span>
             </div>
             <div className="h-2.5 rounded-full bg-slate-100 overflow-hidden">
               <div
-                className="h-full rounded-full bg-blue-500 transition-all duration-300"
-                style={{ width: `${progressPct}%` }}
+                className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                style={{ width: `${progress}%` }}
               />
             </div>
-            <p className="text-xs text-slate-400">
-              ~{(progress.done * CHUNK_SIZE).toLocaleString()} / ~{(progress.total * CHUNK_SIZE).toLocaleString()} SIMs processed
-            </p>
+            {phase === 'parsing' && (
+              <p className="text-xs text-slate-400">
+                Processing {(file!.size / 1024 / 1024).toFixed(0)} MB in 8 MB chunks — no data sent yet
+              </p>
+            )}
           </div>
         )}
 
-        {/* Error */}
         {phase === 'error' && (
           <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
             <XCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
@@ -382,67 +346,92 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
         )}
       </div>
 
-      {/* ── Summary card ─────────────────────────────────────────────────── */}
+      {/* ── Summary ───────────────────────────────────────────────────────── */}
       {summary && phase === 'done' && (
         <div className="bg-white rounded-xl border p-5">
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle2 className="w-5 h-5 text-green-600" />
             <h2 className="text-sm font-bold text-slate-700">Upload Complete — {uploadMonth}</h2>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-3 gap-4">
             {[
-              { label: 'Total in File', value: summary.total,     color: '#1565c0' },
-              { label: 'New Activated', value: summary.new,       color: '#2e7d32' },
-              { label: 'Plan/APN Changed', value: summary.changed,  color: '#f57c00' },
-              { label: 'Unchanged',     value: summary.unchanged, color: '#78909c' },
-              { label: 'Deactivated',   value: summary.deleted,   color: '#c62828' },
-              { label: 'Needs Review',  value: summary.pending,   color: '#7b1fa2' },
+              { label: 'Customers Matched', value: summary.customers - summary.pending, color: '#2e7d32' },
+              { label: 'Total Active SIMs',  value: summary.totalSims,                 color: '#1565c0' },
+              { label: 'Needs Review',        value: summary.pending,                  color: '#f57c00' },
             ].map(s => (
-              <div key={s.label} className="rounded-lg p-3 text-center" style={{ background: `${s.color}12` }}>
-                <p className="text-xl font-extrabold" style={{ color: s.color }}>
-                  {s.value.toLocaleString()}
+              <div key={s.label} className="rounded-lg p-4 text-center" style={{ background: `${s.color}12` }}>
+                <p className="text-2xl font-extrabold" style={{ color: s.color }}>
+                  {s.value.toLocaleString('en-IN')}
                 </p>
-                <p className="text-[11px] text-slate-500 mt-0.5">{s.label}</p>
+                <p className="text-xs text-slate-500 mt-1">{s.label}</p>
               </div>
             ))}
           </div>
+
+          {/* Per-customer breakdown table */}
+          {aggregates.length > 0 && (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b text-slate-500 text-left">
+                    <th className="pb-2 font-semibold">Customer (Raw Name)</th>
+                    <th className="pb-2 font-semibold text-right">Total SIMs</th>
+                    <th className="pb-2 font-semibold">Top Plan</th>
+                    <th className="pb-2 font-semibold">Match</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {aggregates.map(a => {
+                    const topPlan = Object.entries(a.by_plan).sort((x, y) => y[1] - x[1])[0]
+                    return (
+                      <tr key={a.customer_name_raw} className="hover:bg-slate-50">
+                        <td className="py-1.5 font-medium text-slate-700">{a.customer_name_raw}</td>
+                        <td className="py-1.5 text-right font-bold">{a.total_sims.toLocaleString('en-IN')}</td>
+                        <td className="py-1.5 text-slate-500">{topPlan?.[0] ?? '—'}</td>
+                        <td className="py-1.5">
+                          {resolved.has(a.customer_name_raw) ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Resolved</span>
+                          ) : a.match_status === 'matched' ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">Matched</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700">Review</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Pending matches queue ─────────────────────────────────────────── */}
-      {pending.length > 0 && (
+      {/* ── Pending matches ───────────────────────────────────────────────── */}
+      {pending.length > 0 && phase === 'done' && (
         <div className="bg-white rounded-xl border overflow-hidden">
           <button
             onClick={() => setShowPending(v => !v)}
-            className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-50"
           >
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500" />
-              <span className="font-bold text-slate-700 text-sm">
-                Needs Review — Ambiguous Customer Matches
+              <span className="font-bold text-slate-700 text-sm">Ambiguous Customer Names — Needs Review</span>
+              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+                {pending.length} remaining
               </span>
-              <span className="ml-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-                {pending.length - resolvedCount} remaining
-              </span>
-              {resolvedCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
-                  {resolvedCount} resolved
-                </span>
-              )}
             </div>
             {showPending ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
           </button>
 
           {showPending && (
             <div className="border-t">
-              {/* Search */}
               <div className="px-5 py-3 border-b">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search by name or CAF no…"
+                    placeholder="Search customer name…"
                     value={matchSearch}
                     onChange={e => setMatchSearch(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -450,22 +439,17 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
                 </div>
               </div>
 
-              <div className="divide-y max-h-96 overflow-y-auto">
-                {filteredPending.length === 0 ? (
-                  <p className="text-center py-6 text-sm text-slate-400">No unresolved matches{matchSearch ? ' matching search' : ''}.</p>
-                ) : (
-                  filteredPending.map((m) => (
-                    <MatchRow
-                      key={m.imsi}
-                      match={m}
-                      customers={customers}
-                      onResolve={(customerId, save) => resolveMatch(
-                        pending.findIndex(p => p.imsi === m.imsi),
-                        customerId, save
-                      )}
-                    />
-                  ))
-                )}
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {filtered.map(a => (
+                  <MatchRow
+                    key={a.customer_name_raw}
+                    nameRaw={a.customer_name_raw}
+                    totalSims={a.total_sims}
+                    customers={customers}
+                    resolving={resolving === a.customer_name_raw}
+                    onResolve={customerId => handleResolve(a.customer_name_raw, customerId)}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -475,67 +459,41 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
   )
 }
 
-// ── Individual match row ───────────────────────────────────────────────────────
+// ── Match row ─────────────────────────────────────────────────────────────────
 function MatchRow({
-  match, customers, onResolve,
+  nameRaw, totalSims, customers, resolving, onResolve,
 }: {
-  match: PendingMatch
+  nameRaw:   string
+  totalSims: number
   customers: Customer[]
-  onResolve: (customerId: string, saveMapping: boolean) => void
+  resolving: boolean
+  onResolve: (customerId: string) => void
 }) {
-  const [selected,     setSelected]     = useState(match.suggestedId ?? '')
-  const [saveMapping,  setSaveMapping]  = useState(true)
-  const [resolving,    setResolving]    = useState(false)
-
-  async function handleResolve() {
-    if (!selected) return
-    setResolving(true)
-    await onResolve(selected, saveMapping)
-    setResolving(false)
-  }
+  const [selected, setSelected] = useState('')
 
   return (
     <div className="px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-slate-700 truncate">{match.customer_name_raw}</p>
-        <p className="text-[11px] text-slate-400">CAF: {match.caf_no} · IMSI: {match.imsi}</p>
-        {match.suggestedName && (
-          <p className="text-[11px] text-amber-600 mt-0.5">
-            Suggested: <strong>{match.suggestedName}</strong>
-          </p>
-        )}
+        <p className="text-xs font-bold text-slate-700 truncate">{nameRaw}</p>
+        <p className="text-[11px] text-slate-400">{totalSims.toLocaleString('en-IN')} SIMs</p>
       </div>
-
       <div className="flex items-center gap-2 shrink-0">
         <select
           value={selected}
           onChange={e => setSelected(e.target.value)}
-          className="text-xs border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[180px]"
+          className="text-xs border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[200px]"
         >
           <option value="">— select customer —</option>
-          {customers.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
+          {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-
-        <label className="flex items-center gap-1 text-[11px] text-slate-500 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={saveMapping}
-            onChange={e => setSaveMapping(e.target.checked)}
-            className="w-3 h-3"
-          />
-          Remember
-        </label>
-
         <button
-          onClick={handleResolve}
+          onClick={() => onResolve(selected)}
           disabled={!selected || resolving}
           className={cn(
             'flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold transition-colors',
             selected && !resolving
               ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed',
           )}
         >
           {resolving ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle2 className="w-3 h-3" />}
