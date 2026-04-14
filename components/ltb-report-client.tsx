@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
+import { EditStage4Dialog, EditStage1Dialog } from '@/components/funnel-dialogs'
 
 type Opp = {
   id: string
@@ -82,10 +83,12 @@ export function LtbReportClient({
   opps,
   customers,
   monthly,
+  isAdmin = false,
 }: {
   opps: Opp[]
   customers: Customer[]
   monthly: Monthly[]
+  isAdmin?: boolean
 }) {
   const [activeTab, setActiveTab]   = useState<'stage4' | 'stage1' | 'billing'>('stage4')
   const [fyFilter,  setFyFilter]    = useState<string>('all')
@@ -288,6 +291,7 @@ export function LtbReportClient({
                 {['Opp ID','Customer','Category','NAM','Product','Vert.','Qty','PO Value (₹Cr)','PO Date','FY','Contract','Comm. Qty','Monthly ABF (₹Cr)','ABF Gen (₹Cr)','Status'].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600">{h}</th>
                 ))}
+                {isAdmin && <th className="px-3 py-2.5"></th>}
               </tr>
             </thead>
             <tbody>
@@ -345,6 +349,11 @@ export function LtbReportClient({
                         {r.commissioned_status ?? '—'}
                       </span>
                     </td>
+                    {isAdmin && (
+                      <td className="px-3 py-2 text-right">
+                        <EditStage4Dialog row={r} />
+                      </td>
+                    )}
                   </tr>
                 )
               })}
@@ -386,6 +395,7 @@ export function LtbReportClient({
                 {['Opp ID','Customer','Category','NAM','Product','Qty','Value (₹Cr)','Wk1','Wk2','Wk3','Wk4','Current','Commit','Remarks'].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600">{h}</th>
                 ))}
+                {isAdmin && <th className="px-3 py-2.5"></th>}
               </tr>
             </thead>
             <tbody>
@@ -414,6 +424,11 @@ export function LtbReportClient({
                       : '—'}
                   </td>
                   <td className="px-3 py-2 max-w-[200px] truncate text-slate-500 text-xs" title={r.remarks_current ?? ''}>{r.remarks_current ?? '—'}</td>
+                  {isAdmin && (
+                    <td className="px-3 py-2 text-right">
+                      <EditStage1Dialog row={r} namOptions={[]} />
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

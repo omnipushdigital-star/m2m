@@ -1,4 +1,5 @@
 import { getSupabase } from '@/lib/supabase'
+import { getRole } from '@/lib/supabase-server'
 import { LtbReportClient } from '@/components/ltb-report-client'
 
 export const dynamic = 'force-dynamic'
@@ -6,6 +7,8 @@ export const metadata = { title: 'Lead to Bill Report' }
 
 export default async function LtbPage() {
   const supabase = getSupabase()
+  const role     = await getRole()
+  const isAdmin  = role === 'admin'
 
   const [{ data: opps }, { data: customers }, { data: monthly }] = await Promise.all([
     supabase
@@ -30,6 +33,7 @@ export default async function LtbPage() {
       opps={opps ?? []}
       customers={customers ?? []}
       monthly={monthly ?? []}
+      isAdmin={isAdmin}
     />
   )
 }

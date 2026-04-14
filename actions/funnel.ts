@@ -61,6 +61,39 @@ export async function moveToStage4(id: string, formData: FormData) {
   revalidatePath('/funnel/stage4')
 }
 
+// ── Update Stage 4 Opportunity ───────────────────────────────────────────────
+
+export async function updateStage4Opportunity(id: string, formData: FormData) {
+  const supabase = getSupabase()
+
+  const poValue     = formData.get('po_value') as string
+  const annualValue = formData.get('annualized_value') as string
+  const commQty     = formData.get('commissioned_qty') as string
+  const contractYrs = formData.get('contract_period') as string
+  const oppId       = formData.get('opp_id') as string
+  const abfGen      = formData.get('abf_generated_total') as string
+
+  const { error } = await supabase
+    .from('funnel_opportunities')
+    .update({
+      opp_id:              oppId ? parseInt(oppId) : null,
+      po_date:             (formData.get('po_date') as string) || null,
+      po_value:            poValue ? parseFloat(poValue) : null,
+      contract_period:     contractYrs ? parseInt(contractYrs) : null,
+      commissioned_qty:    commQty ? parseInt(commQty) : null,
+      commissioned_status: formData.get('commissioned_status') as string || null,
+      product_vertical:    formData.get('product_vertical') as string || null,
+      annualized_value:    annualValue ? parseFloat(annualValue) : null,
+      abf_generated_total: abfGen ? parseFloat(abfGen) : null,
+      billing_cycle:       formData.get('billing_cycle') as string || null,
+    })
+    .eq('id', id)
+
+  if (error) throw new Error(error.message)
+  revalidatePath('/ltb')
+  revalidatePath('/funnel/stage4')
+}
+
 // ── Update Stage 1 Opportunity ───────────────────────────────────────────────
 
 export async function updateStage1Opportunity(id: string, formData: FormData) {
