@@ -79,10 +79,10 @@ function NamDialog({ existing, onClose }: { existing?: Nam; onClose: () => void 
 
         <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
           <Field label="NAM Key Name" required>
-            <input name="name" required defaultValue={existing?.name ?? ''} className={inputCls}
+            <input name="name" required defaultValue={existing?.name ?? ''}
+              className={cn(inputCls, existing ? 'bg-slate-50 text-slate-500' : '')}
               placeholder="e.g. SUDHANSHU"
               readOnly={!!existing}
-              className={cn(inputCls, existing ? 'bg-slate-50 text-slate-500' : '')}
             />
             <p className="text-xs text-slate-400 mt-0.5">
               Must match exactly the nam_name used in Customers and Funnel tables
@@ -159,19 +159,16 @@ export function NamsClient({
   unmappedNames: string[]
   latestSimMonth: string | null
 }) {
-  const [dialog, setDialog]         = useState<'add' | Nam | null>(null)
-  const [, startTransition]         = useTransition()
-  const _ = startTransition         // suppress unused warning
+  const [dialog, setDialog] = useState<'add' | Nam | null>(null)
 
   const activeNams   = nams.filter(n => n.active)
   const inactiveNams = nams.filter(n => !n.active)
 
   // Grand totals
-  const allStats   = Object.values(statsMap)
-  const totalCusts = allStats.reduce((s, v) => s + v.customers, 0)
+  const allStats    = Object.values(statsMap)
+  const totalCusts  = allStats.reduce((s, v) => s + v.customers, 0)
   const totalStage1 = allStats.reduce((s, v) => s + v.stage1, 0)
-  const totalStage4 = allStats.reduce((s, v) => s + v.stage4, 0)
-  const totalSims  = allStats.reduce((s, v) => s + v.activeSims, 0)
+  const totalSims   = allStats.reduce((s, v) => s + v.activeSims, 0)
 
   return (
     <div className="space-y-6">
