@@ -35,6 +35,7 @@ export async function DashboardCards() {
     { data: fy2627Records },
     { data: fy2526Records },
     { data: allLatestRecords },
+    { data: prevMonthSimRecords },
   ] = await Promise.all([
     supabase.from('customers').select('*', { count: 'exact', head: true }),
     supabase
@@ -59,6 +60,10 @@ export async function DashboardCards() {
       .from('monthly_records')
       .select('customer_id, active_sims, month')
       .order('month', { ascending: false }),
+    supabase
+      .from('monthly_records')
+      .select('active_sims')
+      .eq('month', prevMonth),
   ])
 
   // Latest active_sims per customer
@@ -69,6 +74,7 @@ export async function DashboardCards() {
     }
   }
   const totalActiveSims = Array.from(latestPerCustomer.values()).reduce((s, v) => s + v, 0)
+  const totalPrevMonthSims = (prevMonthSimRecords ?? []).reduce((s, r) => s + (r.active_sims ?? 0), 0)
 
   // Current month aggregates
   const totalAbfCurMonth = (currentMonthRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
@@ -115,6 +121,7 @@ export async function DashboardCards() {
             <p className="text-2xl font-extrabold text-slate-800">
               {totalActiveSims.toLocaleString('en-IN')}
             </p>
+            <MomIndicator cur={totalActiveSims} prev={totalPrevMonthSims} />
           </CardContent>
         </Card>
 
