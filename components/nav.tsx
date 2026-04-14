@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileBarChart2, Layers, TrendingUp,
-  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X, Target, Wifi, BarChart3,
+  CheckCircle2, ClipboardList, ChevronLeft, ChevronRight, Menu, X, Target, Wifi, BarChart3, UserCog,
 } from 'lucide-react'
 
 const links = [
@@ -21,6 +21,7 @@ const links = [
   { href: '/ltb',           label: 'Lead to Bill',        icon: ClipboardList,   adminOnly: false },
   { href: '/sim-inventory', label: 'SIM Analytics',       icon: BarChart3,       adminOnly: false },
   { href: '/sim-upload',    label: 'SIM Upload',          icon: Wifi,            adminOnly: true  },
+  { href: '/nams',          label: 'NAM Registry',        icon: UserCog,         adminOnly: true  },
 ]
 
 // ── Desktop collapsible sidebar ──────────────────────────────────────────────
