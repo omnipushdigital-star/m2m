@@ -22,9 +22,8 @@ type SimRow = {
   service_center:    string
   plan:              string
   apn:               string
-  status:            'active'
   first_seen_month:  string
-  last_seen_month:   string
+  last_seen_month:   string   // source of truth for active/deactivated — no status column needed
   updated_at:        string
 }
 
@@ -112,15 +111,14 @@ async function parseAndMatch(
 
       rows.push({
         imsi,
-        caf_no:            cols[COL.caf_no]?.trim()       ?? '',
-        sim_no:            cols[COL.sim_no]?.trim()       ?? '',
+        caf_no:            cols[COL.caf_no]?.trim()          ?? '',
+        sim_no:            cols[COL.sim_no]?.trim()          ?? '',
         customer_name_raw: raw,
         customer_id:       id,
         match_status:      status,
-        service_center:    cols[COL.service_center]?.trim() ?? '',
-        plan:              cols[COL.plan]?.trim()         ?? '',
-        apn:               cols[COL.apn]?.trim()          ?? '',
-        status:            'active',
+        service_center:    cols[COL.service_center]?.trim()  ?? '',
+        plan:              cols[COL.plan]?.trim()            ?? '',
+        apn:               cols[COL.apn]?.trim()             ?? '',
         first_seen_month:  uploadMonth,
         last_seen_month:   uploadMonth,
         updated_at:        now,
@@ -240,14 +238,21 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
         upserted => setState(s => ({ ...s, upserted })),
       )
 
-      // 3 — Finalize: call PostgreSQL function directly (avoids REST timeout)
+      // 3 — Count deactivated: SIMs present last month but not this month
+      //     No UPDATE needed — last_seen_month IS the source of truth
       setPhase('finalizing')
       const supabase = getSupabase()
-      const { data: deletedCount, error: finError } = await supabase
-        .rpc('finalize_sim_upload', { p_month: uploadMonth })
-      if (finError) throw new Error(finError.message)
+      const d2 = new Date(`${uploadMonth}-01`)
+      d2.setMonth(d2.getMonth() - 1)
+      const prevMonth = d2.toISOString().slice(0, 7)
 
-      setState(s => ({ ...s, deleted: deletedCount ?? 0 }))
+      const { count: prevCount } = await supabase
+        .from('sim_inventory')
+        .select('*', { count: 'exact', head: true })
+        .eq('last_seen_month', prevMonth)
+
+      const deleted = Math.max(0, (prevCount ?? 0) - rows.length)
+      setState(s => ({ ...s, deleted }))
       setPendingRows(pendingList)
       setPhase('done')
 
@@ -351,7 +356,7 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
           {isRunning
             ? phase === 'parsing'    ? 'Parsing file…'
             : phase === 'uploading'  ? `Uploading — ${state.upserted.toLocaleString('en-IN')} / ${state.total.toLocaleString('en-IN')} SIMs`
-            : 'Finalizing…'
+            : 'Counting changes…'
             : 'Start Upload'}
         </button>
 
