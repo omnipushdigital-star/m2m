@@ -10,6 +10,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'M2M Inventory Dashboard',
   description: 'M2M SIM inventory and billing management',
+  icons: {
+    icon: '/bsnl-logo.png',
+    apple: '/bsnl-logo.png',
+  },
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
