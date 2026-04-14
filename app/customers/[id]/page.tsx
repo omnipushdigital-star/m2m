@@ -46,6 +46,28 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
     .eq('customer_id', params.id)
     .order('month', { ascending: false })
 
+  // SIM dump data — latest month summary for this customer
+  const { data: simSummaryRows } = await supabase
+    .from('sim_customer_summary')
+    .select('by_plan, total_sims, upload_month')
+    .eq('customer_id', params.id)
+    .order('upload_month', { ascending: false })
+
+  // Consolidate all rows for the latest month (customer may have multiple raw-name rows)
+  const latestSimMonth = simSummaryRows?.[0]?.upload_month ?? null
+  const simDumpByPlan: Record<string, number> = {}
+  let simDumpTotal = 0
+  ;(simSummaryRows ?? [])
+    .filter(r => r.upload_month === latestSimMonth)
+    .forEach(r => {
+      simDumpTotal += r.total_sims ?? 0
+      if (r.by_plan) {
+        Object.entries(r.by_plan as Record<string, number>).forEach(([plan, cnt]) => {
+          simDumpByPlan[plan] = (simDumpByPlan[plan] ?? 0) + cnt
+        })
+      }
+    })
+
   // Active leads (Stage 4 opportunities) — match by customer name
   const { data: activeLeads } = await supabase
     .from('funnel_opportunities')
@@ -141,12 +163,13 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
             const totalAbf = (monthlyRecords ?? []).reduce((s, r) => s + (r.abf_amount ?? 0), 0)
             const totalRev = (monthlyRecords ?? []).reduce((s, r) => s + (r.revenue_realised ?? 0), 0)
             return (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {[
-                  { label: 'Active SIMs (Latest)',        value: latest.active_sims?.toLocaleString('en-IN') ?? '—',   color: '#1a237e' },
-                  { label: `ABF ${latest.month} (₹ Cr)`, value: latest.abf_amount ? latest.abf_amount.toFixed(3) : '—', color: '#f57c00' },
-                  { label: 'Total ABF FY (₹ Cr)',         value: totalAbf.toFixed(3),                                   color: '#f57c00' },
-                  { label: 'Total Revenue FY (₹ Cr)',     value: totalRev.toFixed(3),                                   color: '#2e7d32' },
+                  { label: 'Billing SIMs (Latest)',       value: latest.active_sims?.toLocaleString('en-IN') ?? '—',                          color: '#1a237e' },
+                  { label: latestSimMonth ? `SIMs in Dump (${latestSimMonth})` : 'SIMs in Dump', value: simDumpTotal > 0 ? simDumpTotal.toLocaleString('en-IN') : '—', color: '#0277bd' },
+                  { label: `ABF ${latest.month} (₹ Cr)`, value: latest.abf_amount ? latest.abf_amount.toFixed(3) : '—',                       color: '#f57c00' },
+                  { label: 'Total ABF FY (₹ Cr)',         value: totalAbf.toFixed(3),                                                           color: '#f57c00' },
+                  { label: 'Total Revenue FY (₹ Cr)',     value: totalRev.toFixed(3),                                                           color: '#2e7d32' },
                 ].map(c => (
                   <div key={c.label} className="rounded-md bg-white shadow-sm p-3" style={{ borderTop: `3px solid ${c.color}` }}>
                     <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: c.color }}>{c.label}</p>
@@ -189,6 +212,8 @@ export default async function CustomerDetailPage({ params }: { params: { id: str
             customerPlans={(customerPlans ?? []) as (CustomerPlan & { plan: Plan })[]}
             allPlans={allPlans ?? []}
             isAdmin={isAdmin}
+            dumpByPlan={simDumpTotal > 0 ? simDumpByPlan : undefined}
+            dumpMonth={latestSimMonth ?? undefined}
           />
         </TabsContent>
 
