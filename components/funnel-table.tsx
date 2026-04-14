@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Download } from 'lucide-react'
 import { downloadExcel } from '@/lib/export-excel'
+import { MoveToStage4Dialog, EditStage1Dialog } from '@/components/funnel-dialogs'
 
 const categoryColors: Record<string, string> = {
   GOVT:    '#1a237e',
@@ -82,7 +83,12 @@ function TextFilter({ value, onChange }: { value: string; onChange: (v: string) 
   )
 }
 
-export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }) {
+export function FunnelTable({ data, stage, isAdmin = false, namOptions = [] }: {
+  data: FunnelRow[]
+  stage: 1 | 4
+  isAdmin?: boolean
+  namOptions?: string[]
+}) {
   const [filters, setFilters] = useState({
     customer: '',
     nam: '',
@@ -238,6 +244,12 @@ export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }
                     Current Remarks
                     <div className="mt-1 h-[26px]" />
                   </th>
+                  {isAdmin && stage === 1 && (
+                    <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide min-w-[140px]">
+                      Actions
+                      <div className="mt-1 h-[26px]" />
+                    </th>
+                  )}
                 </>
               ) : (
                 <>
@@ -335,6 +347,14 @@ export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }
                         <td className="px-3 py-2 text-slate-500 max-w-[200px] truncate" title={r.remarks_current ?? ''}>
                           {r.remarks_current ?? '—'}
                         </td>
+                        {isAdmin && stage === 1 && (
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <EditStage1Dialog row={r as Parameters<typeof EditStage1Dialog>[0]['row']} namOptions={namOptions} />
+                              <MoveToStage4Dialog opportunityId={r.id} customerName={r.customer_name} quantity={r.quantity ?? null} />
+                            </div>
+                          </td>
+                        )}
                       </>
                     ) : (
                       <>
@@ -398,7 +418,7 @@ export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }
                   {totalValue.toFixed(2)} Cr
                 </td>
                 {stage === 1 ? (
-                  <td colSpan={stage1Cols} />
+                  <td colSpan={stage1Cols + (isAdmin ? 1 : 0)} />
                 ) : (
                   <>
                     <td colSpan={3} /> {/* opp_id, po_date, contract */}
