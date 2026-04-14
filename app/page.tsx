@@ -8,6 +8,7 @@ import { VerticalAbfChart } from '@/components/vertical-abf-chart'
 import { TopCustomersTable } from '@/components/top-customers-table'
 import { NamFunnelPanel } from '@/components/nam-funnel-panel'
 import { NamAbfChart } from '@/components/nam-abf-chart'
+import { SimSnapshotPanel } from '@/components/sim-snapshot-panel'
 
 // ── Section heading helper ────────────────────────────────────────────────
 function SectionHeading({ title, color }: { title: string; color: string }) {
@@ -204,6 +205,16 @@ export default function DashboardPage() {
           </Suspense>
         </div>
       </div>
+
+      {/* ── SIM Inventory Snapshot ── */}
+      <Suspense fallback={
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="h-72 rounded-lg bg-slate-100 animate-pulse" />
+          <div className="h-72 rounded-lg bg-slate-100 animate-pulse" />
+        </div>
+      }>
+        <SimSnapshotPanel />
+      </Suspense>
 
     </div>
   )
