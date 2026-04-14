@@ -11,7 +11,7 @@ export default async function SimInventoryPage() {
     .select('upload_month')
     .order('upload_month', { ascending: false })
 
-  const months = [...new Set((monthsData ?? []).map(r => r.upload_month))]
+  const months = Array.from(new Set((monthsData ?? []).map(r => r.upload_month)))
 
   return (
     <div className="space-y-4">
