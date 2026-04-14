@@ -54,13 +54,13 @@ export function Nav() {
         <Image
           src="/bsnl-logo.png"
           alt="BSNL"
-          width={collapsed ? 32 : 72}
-          height={collapsed ? 32 : 72}
+          width={collapsed ? 36 : 100}
+          height={collapsed ? 36 : 100}
           className="object-contain transition-all duration-200"
           priority
         />
         {!collapsed && (
-          <p className="text-white/80 text-[10px] tracking-wide mt-1 whitespace-nowrap">
+          <p className="text-white/80 text-[11px] tracking-wide mt-2 whitespace-nowrap font-medium">
             Bharat Sanchar Nigam
           </p>
         )}
