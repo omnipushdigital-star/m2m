@@ -1,0 +1,36 @@
+-- ── Full SIM inventory — current state only, no history ──────────────────────
+-- ~1.6M rows, constant size (upsert on IMSI, never grows month-over-month)
+-- Run in Supabase SQL Editor
+
+-- Drop previous attempt tables if they exist
+DROP TABLE IF EXISTS sim_customer_summary CASCADE;
+DROP TABLE IF EXISTS sim_change_log       CASCADE;
+
+-- One row per IMSI — upserted every upload, imsi is the PK
+CREATE TABLE IF NOT EXISTS sim_inventory (
+  imsi              TEXT PRIMARY KEY,
+  caf_no            TEXT,
+  sim_no            TEXT,
+  customer_name_raw TEXT,
+  customer_id       UUID REFERENCES customers(id) ON DELETE SET NULL,
+  match_status      TEXT NOT NULL DEFAULT 'pending',  -- 'matched' | 'pending'
+  service_center    TEXT,
+  plan              TEXT,
+  apn               TEXT,
+  status            TEXT NOT NULL DEFAULT 'active',   -- 'active' | 'deleted'
+  first_seen_month  TEXT NOT NULL,   -- YYYY-MM
+  last_seen_month   TEXT NOT NULL,   -- YYYY-MM
+  updated_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS sim_inv_customer_idx  ON sim_inventory(customer_id);
+CREATE INDEX IF NOT EXISTS sim_inv_status_idx    ON sim_inventory(status);
+CREATE INDEX IF NOT EXISTS sim_inv_month_idx     ON sim_inventory(last_seen_month);
+CREATE INDEX IF NOT EXISTS sim_inv_match_idx     ON sim_inventory(match_status);
+CREATE INDEX IF NOT EXISTS sim_inv_custname_idx  ON sim_inventory(customer_name_raw);
+
+-- Allow browser (anon key) to read and write — internal admin tool
+ALTER TABLE sim_inventory ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_all" ON sim_inventory FOR ALL USING (true) WITH CHECK (true);
+
+-- customer_caf_mapping already exists from 20260413 migration — leave it
