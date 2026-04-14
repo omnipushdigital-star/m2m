@@ -548,7 +548,7 @@ function TrendsTab({ data, selectedMonth }: { data: AnalyticsData; selectedMonth
   })
 
   // Get all months from change log
-  const allMonths = [...new Set(data.changeLog.map(r => r.upload_month))].sort().reverse()
+  const allMonths = Array.from(new Set(data.changeLog.map(r => r.upload_month))).sort().reverse()
 
   // Build per-customer timeline: { rawName -> { month -> {total, netChange} } }
   const timeline: Record<string, Record<string, { total: number; net: number | null }>> = {}
