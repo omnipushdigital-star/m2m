@@ -63,6 +63,44 @@ type CustomerRow = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Merge multiple sim_customer_summary rows that share the same customer_id
+ * into a single consolidated row (sum total_sims, merge by_plan/by_apn).
+ * Rows without a customer_id (pending/other_unit) are kept as-is by raw name.
+ */
+function consolidateByCustomerId(simData: SimSummary[]): SimSummary[] {
+  const map = new Map<string, SimSummary>()
+
+  simData.forEach(row => {
+    const key = row.customer_id ? `id:${row.customer_id}` : `raw:${row.customer_name_raw}`
+    const existing = map.get(key)
+
+    if (!existing) {
+      map.set(key, {
+        ...row,
+        by_plan: row.by_plan ? { ...row.by_plan } : null,
+        by_apn:  row.by_apn  ? { ...row.by_apn  } : null,
+      })
+    } else {
+      existing.total_sims += row.total_sims
+      if (row.by_plan) {
+        if (!existing.by_plan) existing.by_plan = {}
+        Object.entries(row.by_plan).forEach(([plan, cnt]) => {
+          existing.by_plan![plan] = (existing.by_plan![plan] ?? 0) + cnt
+        })
+      }
+      if (row.by_apn) {
+        if (!existing.by_apn) existing.by_apn = {}
+        Object.entries(row.by_apn).forEach(([apn, cnt]) => {
+          existing.by_apn![apn] = (existing.by_apn![apn] ?? 0) + cnt
+        })
+      }
+    }
+  })
+
+  return Array.from(map.values())
+}
+
 function fmt(n: number) {
   return n.toLocaleString('en-IN')
 }
@@ -112,11 +150,12 @@ function StatCard({
 // ── Tab: Overview ─────────────────────────────────────────────────────────────
 
 function OverviewTab({ data, month }: { data: AnalyticsData; month: string }) {
-  const matched    = data.simData.filter(r => r.match_status === 'matched')
-  const pending    = data.simData.filter(r => r.match_status === 'pending')
-  const otherUnit  = data.simData.filter(r => r.match_status === 'other_unit')
+  const consolidated = consolidateByCustomerId(data.simData)
+  const matched    = consolidated.filter(r => r.match_status === 'matched')
+  const pending    = consolidated.filter(r => r.match_status === 'pending')
+  const otherUnit  = consolidated.filter(r => r.match_status === 'other_unit')
 
-  const dumpTotal    = data.simData.reduce((s, r) => s + r.total_sims, 0)
+  const dumpTotal    = consolidated.reduce((s, r) => s + r.total_sims, 0)
   const dumpMatched  = matched.reduce((s, r) => s + r.total_sims, 0)
   const billingTotal = data.billingData.reduce((s, r) => s + (r.active_sims ?? 0), 0)
   const variance     = billingTotal - dumpTotal
@@ -126,7 +165,7 @@ function OverviewTab({ data, month }: { data: AnalyticsData; month: string }) {
   const billingMap = new Map<string, BillingRecord>()
   data.billingData.forEach(r => billingMap.set(r.customer_id, r))
 
-  // Top 10 customers by dump SIMs
+  // Top 10 customers by dump SIMs (already consolidated)
   const top10 = [...matched]
     .sort((a, b) => b.total_sims - a.total_sims)
     .slice(0, 10)
@@ -219,9 +258,12 @@ function OverviewTab({ data, month }: { data: AnalyticsData; month: string }) {
 function PlanBreakdownTab({ data }: { data: AnalyticsData }) {
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
 
+  // Consolidate rows with same customer_id before any display
+  const consolidated = consolidateByCustomerId(data.simData)
+
   // Aggregate all plans across matched customers
   const planTotals: Record<string, number> = {}
-  const matched = data.simData.filter(r => r.match_status === 'matched')
+  const matched = consolidated.filter(r => r.match_status === 'matched')
   matched.forEach(r => {
     if (!r.by_plan) return
     Object.entries(r.by_plan).forEach(([plan, cnt]) => {
@@ -372,8 +414,8 @@ function BillingComparisonTab({ data }: { data: AnalyticsData }) {
   const billingMap = new Map<string, BillingRecord>()
   data.billingData.forEach(r => billingMap.set(r.customer_id, r))
 
-  // Build comparison rows for matched customers
-  const rows: CustomerRow[] = data.simData
+  // Build comparison rows for matched customers (consolidated by customer_id)
+  const rows: CustomerRow[] = consolidateByCustomerId(data.simData)
     .filter(r => r.match_status === 'matched' && r.customer_id)
     .map(r => {
       const billing   = billingMap.get(r.customer_id!)
