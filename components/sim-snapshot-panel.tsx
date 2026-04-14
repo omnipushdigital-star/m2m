@@ -52,7 +52,7 @@ export async function SimSnapshotPanel() {
   if (!rawRows || rawRows.length === 0) return null
 
   // Consolidate duplicates
-  const rows = consolidate(rawRows as SimRow[])
+  const rows = consolidate(rawRows as unknown as SimRow[])
   const matched = rows.filter(r => r.match_status === 'matched')
 
   // ── Plan totals ─────────────────────────────────────────────────
