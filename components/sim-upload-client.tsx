@@ -240,17 +240,14 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
         upserted => setState(s => ({ ...s, upserted })),
       )
 
-      // 3 — Finalize: mark deactivated SIMs server-side
+      // 3 — Finalize: call PostgreSQL function directly (avoids REST timeout)
       setPhase('finalizing')
-      const finRes = await fetch('/api/sim-upload/finalize', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ uploadMonth }),
-      })
-      const finData = await finRes.json()
-      if (finData.error) throw new Error(finData.error)
+      const supabase = getSupabase()
+      const { data: deletedCount, error: finError } = await supabase
+        .rpc('finalize_sim_upload', { p_month: uploadMonth })
+      if (finError) throw new Error(finError.message)
 
-      setState(s => ({ ...s, deleted: finData.deleted ?? 0 }))
+      setState(s => ({ ...s, deleted: deletedCount ?? 0 }))
       setPendingRows(pendingList)
       setPhase('done')
 
