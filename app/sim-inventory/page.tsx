@@ -24,6 +24,12 @@ export default async function SimInventoryPage() {
         </p>
       </div>
 
+      {/* Detailed analytics tabs */}
+      <SimInventoryClient months={months} />
+
+      {/* Divider */}
+      <div className="border-t border-slate-200" />
+
       {/* Snapshot: plan-wise + customer-wise with click-to-filter */}
       <Suspense fallback={
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -33,12 +39,6 @@ export default async function SimInventoryPage() {
       }>
         <SimSnapshotPanel />
       </Suspense>
-
-      {/* Divider */}
-      <div className="border-t border-slate-200" />
-
-      {/* Detailed analytics tabs */}
-      <SimInventoryClient months={months} />
     </div>
   )
 }
