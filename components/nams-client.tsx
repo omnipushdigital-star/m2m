@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef } from 'react'
 import { cn } from '@/lib/utils'
-import { Users, TrendingUp, CheckCircle2, Wifi, Mail, Phone, AlertTriangle, Plus, Edit2, X } from 'lucide-react'
+import { Users, TrendingUp, CheckCircle2, Wifi, Mail, Phone, AlertTriangle, Plus, Edit2 } from 'lucide-react'
 import { addNam, updateNam } from '@/actions/nams'
 
 type Nam = {
@@ -246,7 +246,7 @@ export function NamsClient({
         <div className="bg-white rounded-xl border border-dashed border-slate-200 px-6 py-16 text-center">
           <Users className="w-8 h-8 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 font-medium">No NAMs registered yet</p>
-          <p className="text-xs text-slate-400 mt-1">Click "Add NAM" to register your first NAM</p>
+          <p className="text-xs text-slate-400 mt-1">Click &ldquo;Add NAM&rdquo; to register your first NAM</p>
         </div>
       ) : (
         <div className="space-y-4">
