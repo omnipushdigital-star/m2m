@@ -476,7 +476,7 @@ export function ReportBuilder({
 
 /* ─────────────────────────── results table ─────────────────────────── */
 
-function ResultsTable({ rows, reportType, color }: { rows: Row[]; reportType: ReportType; color: string }) {
+function ResultsTable({ rows, color }: { rows: Row[]; reportType: ReportType; color: string }) {
   const cols = Object.keys(rows[0] ?? {})
 
   // Numeric columns for right-alignment

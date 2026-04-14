@@ -126,7 +126,6 @@ export function FunnelTable({ data, stage }: { data: FunnelRow[]; stage: 1 | 4 }
   const hasFilter     = Object.values(filters).some(Boolean)
 
   // Stage 4: number of extra columns beyond the shared ones
-  const stage4Cols = 7  // opp_id, PO Date, Contract, Vertical, Comm.Qty, Monthly ABF, ABF Gen
   const stage1Cols = 4  // Commitment, Wk1, Business Type, Remarks
 
   function handleExport() {

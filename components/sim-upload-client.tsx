@@ -454,7 +454,7 @@ export function SimUploadClient({ customers }: { customers: Customer[] }) {
                 {filteredPending.length === 0 ? (
                   <p className="text-center py-6 text-sm text-slate-400">No unresolved matches{matchSearch ? ' matching search' : ''}.</p>
                 ) : (
-                  filteredPending.map((m, i) => (
+                  filteredPending.map((m) => (
                     <MatchRow
                       key={m.imsi}
                       match={m}

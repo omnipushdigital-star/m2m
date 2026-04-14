@@ -131,9 +131,6 @@ export function LtbReportClient({
     return m
   }, [monthly])
 
-  const custIdMap = useMemo(() =>
-    new Map(customers.map(c => [c.name.toUpperCase(), c.id])), [customers])
-
   // ── Totals ──
   const totalPO      = stage4.reduce((s, r) => s + (r.po_value ?? 0), 0)
   const totalMonthly = stage4.reduce((s, r) => s + (monthlyAbf(r) ?? 0), 0)
