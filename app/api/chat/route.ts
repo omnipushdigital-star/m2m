@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export const runtime = 'edge'
+// Use Node.js runtime (not edge) for reliable fetch + env var access
+export const dynamic = 'force-dynamic'
 
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
 const MODEL = 'google/gemma-4-31b-it'
 
@@ -32,18 +32,27 @@ Your role:
 You do NOT have direct access to live database records — you rely on what the user tells you or describes. Be helpful, honest, and keep responses short (2-4 sentences unless a longer explanation is needed).`
 
 export async function POST(req: NextRequest) {
-  if (!NVIDIA_API_KEY) {
+  const apiKey = process.env.NVIDIA_API_KEY
+
+  if (!apiKey) {
     return NextResponse.json({ error: 'NVIDIA_API_KEY not configured' }, { status: 500 })
   }
 
+  let messages: { role: string; content: string }[]
   try {
-    const { messages } = await req.json()
+    const body = await req.json()
+    messages = body.messages ?? []
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
 
+  try {
     const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NVIDIA_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         model: MODEL,
@@ -55,22 +64,32 @@ export async function POST(req: NextRequest) {
         top_p: 0.95,
         max_tokens: 1024,
         stream: false,
-        chat_template_kwargs: { enable_thinking: false },
       }),
     })
 
+    const responseText = await response.text()
+
     if (!response.ok) {
-      const err = await response.text()
-      console.error('NVIDIA API error:', err)
-      return NextResponse.json({ error: 'AI service error' }, { status: 502 })
+      console.error('NVIDIA API error:', response.status, responseText)
+      return NextResponse.json(
+        { error: `AI service returned ${response.status}` },
+        { status: 502 }
+      )
     }
 
-    const data = await response.json()
+    let data: { choices?: { message?: { content?: string } }[] }
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      console.error('Failed to parse NVIDIA response:', responseText.slice(0, 200))
+      return NextResponse.json({ error: 'Invalid response from AI service' }, { status: 502 })
+    }
+
     const content = data.choices?.[0]?.message?.content ?? 'No response received.'
     return NextResponse.json({ content })
 
   } catch (err) {
-    console.error('Chat route error:', err)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    console.error('Chat route fetch error:', err)
+    return NextResponse.json({ error: 'Failed to reach AI service' }, { status: 500 })
   }
 }
