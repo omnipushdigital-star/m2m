@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { Nav, MobileNav } from '@/components/nav'
 import { HeaderUser } from '@/components/header-user'
+import { ChatWidget } from '@/components/chat-widget'
 import { getSession, getRole } from '@/lib/supabase-server'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -83,6 +84,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {' · '}NAM EB Platinum Unit Gurgaon
           </footer>
         </div>
+
+        {/* ── AI Chat Widget (floating, visible on all pages) ── */}
+        <ChatWidget />
 
       </body>
     </html>
