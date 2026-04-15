@@ -67,13 +67,14 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
   try {
     // ── Stage 4 opportunities ────────────────────────────────────────────────
+    // po_value & annualized_value are stored in LAKHS
     if (intent.wantsStage4 || (!intent.wantsStage1 && !intent.wantsSims && !intent.wantsBilling && intent.namMentioned)) {
       let q = sb
         .from('funnel_opportunities')
-        .select('customer_name, nam_name, po_value, po_date, commissioned_qty, vertical, billing_cycle, annualised_value')
+        .select('customer_name, nam_name, po_value, annualized_value, po_date, commissioned_qty, product_vertical, billing_cycle, abf_generated_total')
         .eq('funnel_stage', 4)
         .order('po_value', { ascending: false })
-        .limit(20)
+        .limit(50)
 
       if (intent.namMentioned) {
         q = q.ilike('nam_name', `%${intent.namMentioned}%`)
@@ -81,14 +82,15 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
       const { data, error } = await q
       if (!error && data && data.length > 0) {
-        const total = data.reduce((s, r) => s + Number(r.po_value ?? 0), 0)
-        const annTotal = data.reduce((s, r) => s + Number(r.annualised_value ?? 0), 0)
+        const total    = data.reduce((s, r) => s + Number(r.po_value ?? 0), 0)
+        const annTotal = data.reduce((s, r) => s + Number(r.annualized_value ?? 0), 0)
+        const abfTotal = data.reduce((s, r) => s + Number(r.abf_generated_total ?? 0), 0)
         sections.push(
-          `## Stage 4 Opportunities${intent.namMentioned ? ` (NAM: ${intent.namMentioned})` : ''}`,
-          `Total PO Value: ₹${(total / 100000).toFixed(2)} Lakhs | Annualised: ₹${(annTotal / 100000).toFixed(2)} Lakhs | Count: ${data.length}`,
-          'Customer | NAM | PO Value (₹) | Commissioned Qty | Vertical | Billing Cycle',
+          `## Stage 4 Closed Deals${intent.namMentioned ? ` (NAM: ${intent.namMentioned})` : ''}`,
+          `Count: ${data.length} | Total PO Value: ₹${total.toFixed(3)} Lakhs | Annualised: ₹${annTotal.toFixed(3)} Lakhs | ABF Generated: ₹${abfTotal.toFixed(3)} Lakhs`,
+          'Customer | NAM | PO Value (L) | Annualised (L) | ABF Generated (L) | Commissioned Qty',
           ...data.map(r =>
-            `${r.customer_name} | ${r.nam_name} | ${r.po_value?.toLocaleString('en-IN') ?? '—'} | ${r.commissioned_qty ?? '—'} | ${r.vertical ?? '—'} | ${r.billing_cycle ?? '—'}`
+            `${r.customer_name} | ${r.nam_name} | ${Number(r.po_value ?? 0).toFixed(3)} | ${Number(r.annualized_value ?? 0).toFixed(3)} | ${Number(r.abf_generated_total ?? 0).toFixed(3)} | ${r.commissioned_qty ?? '—'}`
           )
         )
       } else if (!error && data?.length === 0) {
@@ -97,13 +99,14 @@ async function fetchContextData(userQuestion: string): Promise<string> {
     }
 
     // ── Stage 1 opportunities ────────────────────────────────────────────────
+    // after_discount is stored in LAKHS (estimated deal value)
     if (intent.wantsStage1) {
       let q = sb
         .from('funnel_opportunities')
-        .select('customer_name, nam_name, category, product, estimated_value, commitment_date, remarks')
+        .select('customer_name, nam_name, main_category, product_name, after_discount, base_tariff, commitment, remarks_current')
         .eq('funnel_stage', 1)
-        .order('estimated_value', { ascending: false })
-        .limit(20)
+        .order('after_discount', { ascending: false })
+        .limit(50)
 
       if (intent.namMentioned) {
         q = q.ilike('nam_name', `%${intent.namMentioned}%`)
@@ -111,13 +114,13 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
       const { data, error } = await q
       if (!error && data && data.length > 0) {
-        const total = data.reduce((s, r) => s + Number(r.estimated_value ?? 0), 0)
+        const total = data.reduce((s, r) => s + Number(r.after_discount ?? 0), 0)
         sections.push(
           `## Stage 1 Pipeline${intent.namMentioned ? ` (NAM: ${intent.namMentioned})` : ''}`,
-          `Total Pipeline Value: ₹${(total / 100000).toFixed(2)} Lakhs | Count: ${data.length}`,
-          'Customer | NAM | Est. Value (₹) | Category | Product | Commitment Date',
+          `Count: ${data.length} | Total Pipeline Value: ₹${total.toFixed(3)} Lakhs`,
+          'Customer | NAM | Value (L) | Category | Product | Commitment',
           ...data.map(r =>
-            `${r.customer_name} | ${r.nam_name} | ${r.estimated_value?.toLocaleString('en-IN') ?? '—'} | ${r.category ?? '—'} | ${r.product ?? '—'} | ${r.commitment_date ?? '—'}`
+            `${r.customer_name} | ${r.nam_name} | ${Number(r.after_discount ?? 0).toFixed(3)} | ${r.main_category ?? '—'} | ${r.product_name ?? '—'} | ${r.commitment ?? '—'}`
           )
         )
       } else if (!error && data?.length === 0) {
@@ -151,17 +154,17 @@ async function fetchContextData(userQuestion: string): Promise<string> {
           })
         }
 
-        // Cast to Number — Supabase can return numeric fields as strings
+        // abf_amount is stored in CRORES
         const totalSims = rows.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
         const totalAbf  = rows.reduce((s, r) => s + Number(r.abf_amount  ?? 0), 0)
 
         sections.push(
           `## Active SIMs & Billing (Month: ${targetMonth})${intent.namMentioned ? ` — NAM: ${intent.namMentioned}` : ''}`,
-          `Total Active SIMs: ${totalSims.toLocaleString('en-IN')} | Total ABF: ₹${(totalAbf / 100000).toFixed(2)} Lakhs | Customers: ${rows.length}`,
-          'Customer | NAM | Active SIMs | ABF (₹)',
+          `Total Active SIMs: ${totalSims.toLocaleString('en-IN')} | Total ABF: ₹${totalAbf.toFixed(4)} Cr (= ₹${(totalAbf * 100).toFixed(2)} Lakhs) | Customers: ${rows.length}`,
+          'Customer | NAM | Active SIMs | ABF (Cr)',
           ...rows.map(r => {
             const c = r.customers as { name?: string; nam_name?: string } | null
-            return `${c?.name ?? '—'} | ${c?.nam_name ?? '—'} | ${Number(r.active_sims ?? 0).toLocaleString('en-IN')} | ${Number(r.abf_amount ?? 0).toLocaleString('en-IN')}`
+            return `${c?.name ?? '—'} | ${c?.nam_name ?? '—'} | ${Number(r.active_sims ?? 0).toLocaleString('en-IN')} | ${Number(r.abf_amount ?? 0).toFixed(4)}`
           })
         )
       } else if (!error) {
@@ -196,13 +199,14 @@ async function fetchContextData(userQuestion: string): Promise<string> {
     if (sections.length === 0) {
       const [custRes, s4Res, s1Res, simRes] = await Promise.all([
         sb.from('customers').select('id', { count: 'exact', head: true }),
-        sb.from('funnel_opportunities').select('po_value').eq('funnel_stage', 4),
-        sb.from('funnel_opportunities').select('estimated_value').eq('funnel_stage', 1),
-        sb.from('monthly_records').select('active_sims, abf_amount, month').order('month', { ascending: false }).limit(200),
+        sb.from('funnel_opportunities').select('po_value, annualized_value').eq('funnel_stage', 4),
+        sb.from('funnel_opportunities').select('after_discount').eq('funnel_stage', 1),
+        sb.from('monthly_records').select('active_sims, abf_amount, month').order('month', { ascending: false }).limit(300),
       ])
 
-      const totalS4 = (s4Res.data ?? []).reduce((s, r) => s + Number(r.po_value ?? 0), 0)
-      const totalS1 = (s1Res.data ?? []).reduce((s, r) => s + Number(r.estimated_value ?? 0), 0)
+      // po_value / after_discount in LAKHS; abf_amount in CRORES
+      const totalS4   = (s4Res.data ?? []).reduce((s, r) => s + Number(r.po_value ?? 0), 0)
+      const totalS1   = (s1Res.data ?? []).reduce((s, r) => s + Number(r.after_discount ?? 0), 0)
       const latestMonth = simRes.data?.[0]?.month ?? 'unknown'
       const latestRows  = (simRes.data ?? []).filter(r => r.month === latestMonth)
       const totalSims   = latestRows.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
@@ -211,9 +215,9 @@ async function fetchContextData(userQuestion: string): Promise<string> {
       sections.push(
         '## Dashboard Summary',
         `Total Customers: ${custRes.count ?? '—'}`,
-        `Stage 4 (Closed): ${s4Res.data?.length ?? 0} deals | Total PO Value: ₹${(totalS4 / 100000).toFixed(2)} Lakhs`,
-        `Stage 1 (Pipeline): ${s1Res.data?.length ?? 0} opportunities | Total Value: ₹${(totalS1 / 100000).toFixed(2)} Lakhs`,
-        `Active SIMs (${latestMonth}): ${totalSims.toLocaleString('en-IN')} | ABF: ₹${(totalAbf / 100000).toFixed(2)} Lakhs`,
+        `Stage 4 (Closed): ${s4Res.data?.length ?? 0} deals | Total PO Value: ₹${totalS4.toFixed(3)} Lakhs`,
+        `Stage 1 (Pipeline): ${s1Res.data?.length ?? 0} opportunities | Total Pipeline: ₹${totalS1.toFixed(3)} Lakhs`,
+        `Active SIMs (${latestMonth}): ${totalSims.toLocaleString('en-IN')} | ABF: ₹${totalAbf.toFixed(4)} Cr (₹${(totalAbf * 100).toFixed(2)} Lakhs)`,
       )
     }
 

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Bot, User, Loader2 } from 'lucide-react'
+import { MessageCircle, X, Send, User, Loader2 } from 'lucide-react'
+import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 type Message = {
@@ -146,12 +147,12 @@ export function ChatWidget() {
           {/* Header */}
           <div className="px-4 py-3 flex items-center gap-3 border-b border-slate-100 shrink-0"
             style={{ background: '#1565c0' }}>
-            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-              <Bot className="w-4 h-4 text-white" />
+            <div className="w-9 h-9 rounded-full bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+              <Image src="/bsnl-logo.png" alt="BSNL" width={32} height={32} className="object-contain" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white">M2M Assistant</p>
-              <p className="text-xs text-blue-200">Powered by Gemma 4 · NVIDIA NIM</p>
+              <p className="text-sm font-bold text-white tracking-wide">EB CHAT AGENT</p>
+              <p className="text-xs text-blue-200">EB Platinum Gurgaon</p>
             </div>
             {streaming && (
               <span className="text-xs text-blue-200 flex items-center gap-1">
