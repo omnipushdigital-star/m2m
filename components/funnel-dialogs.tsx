@@ -275,17 +275,22 @@ export function MoveToStage4Dialog({ opportunityId, customerName, quantity }: {
 type Stage4Row = {
   id: string
   customer_name: string
+  nam_name: string | null
+  main_category: string | null
+  product_name: string | null
+  product_details: string | null
   opp_id: number | null
   po_date: string | null
   po_value: number | null
   contract_period: number | null
+  quantity: number | null
   commissioned_qty: number | null
   commissioned_status: string | null
   product_vertical: string | null
+  billing_cycle: string | null
   annualized_value: number | null
   abf_generated_total: number | null
-  billing_cycle: string | null
-  quantity: number | null
+  remarks_current: string | null
 }
 
 export function EditStage4Dialog({ row }: { row: Stage4Row }) {
@@ -330,24 +335,53 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
               <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
             </div>
 
-            <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+            <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
 
-              {/* Row 1: Opp ID + PO Date */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Section: Basic Info */}
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Basic Info</p>
+              <div className="grid grid-cols-3 gap-4">
                 <Field label="Opp ID">
                   <input name="opp_id" type="number" defaultValue={row.opp_id ?? ''} className={inputCls} placeholder="e.g. 580718" />
                 </Field>
-                <Field label="PO Date">
-                  <input name="po_date" type="date" defaultValue={row.po_date ?? ''} className={inputCls} />
+                <Field label="NAM">
+                  <input name="nam_name" defaultValue={row.nam_name ?? ''} className={inputCls} placeholder="NAM name" />
+                </Field>
+                <Field label="Category">
+                  <select name="main_category" defaultValue={row.main_category ?? ''} className={selectCls}>
+                    <option value="">— Select —</option>
+                    <option>GOVT</option><option>PSU</option><option>PRIVATE</option>
+                  </select>
                 </Field>
               </div>
 
-              {/* Row 2: PO Value + Contract Period */}
               <div className="grid grid-cols-2 gap-4">
+                <Field label="Product / Service">
+                  <input name="product_name" defaultValue={row.product_name ?? ''} className={inputCls} placeholder="e.g. M2M SIM" />
+                </Field>
+                <Field label="Product Details">
+                  <input name="product_details" defaultValue={row.product_details ?? ''} className={inputCls} placeholder="Additional details" />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Total Contracted Qty">
+                  <input name="quantity" type="number" min="0" defaultValue={row.quantity ?? ''} className={inputCls} placeholder="0" />
+                </Field>
+                <Field label="Remarks">
+                  <input name="remarks_current" defaultValue={row.remarks_current ?? ''} className={inputCls} placeholder="Current status remarks" />
+                </Field>
+              </div>
+
+              {/* Section: PO Details */}
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">PO Details</p>
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="PO Date">
+                  <input name="po_date" type="date" defaultValue={row.po_date ?? ''} className={inputCls} />
+                </Field>
                 <Field label="PO Value (₹ Cr)" required>
                   <input name="po_value" type="number" step="0.001" min="0" defaultValue={row.po_value ?? ''} className={inputCls} placeholder="0.000" />
                 </Field>
-                <Field label="Contract Period (Years)">
+                <Field label="Contract Period">
                   <select name="contract_period" defaultValue={row.contract_period ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
                     {[1,2,3,5].map(n => <option key={n} value={n}>{n} Year{n > 1 ? 's' : ''}</option>)}
@@ -355,41 +389,38 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                 </Field>
               </div>
 
-              {/* Row 3: Commissioned Qty + Status — full labels, no overflow */}
-              <div className="grid grid-cols-2 gap-4">
-                <Field label={`Commissioned Qty${row.quantity ? ` (Total: ${row.quantity.toLocaleString('en-IN')})` : ''}`}>
+              {/* Section: Commissioning */}
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">Commissioning</p>
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="Commissioned Qty">
                   <input name="commissioned_qty" type="number" min="0" defaultValue={row.commissioned_qty ?? ''} className={inputCls} placeholder="0" />
                 </Field>
-                <Field label="Commissioned Status">
+                <Field label="Commission Status">
                   <select name="commissioned_status" defaultValue={row.commissioned_status ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
-                    <option>Full</option>
-                    <option>Partial</option>
-                  </select>
-                </Field>
-              </div>
-
-              {/* Row 4: Vertical + Billing Cycle */}
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Product Vertical">
-                  <select name="product_vertical" defaultValue={row.product_vertical ?? ''} className={selectCls}>
-                    <option value="">— Select —</option>
-                    <option>CM</option>
-                    <option>EB</option>
-                    <option>CFA</option>
+                    <option>Full</option><option>Partial</option>
                   </select>
                 </Field>
                 <Field label="Billing Cycle">
                   <select name="billing_cycle" defaultValue={row.billing_cycle ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
-                    <option>Monthly</option>
-                    <option>Quarterly</option>
-                    <option>Annually</option>
+                    <option>Monthly</option><option>Quarterly</option><option>Annually</option>
                   </select>
                 </Field>
               </div>
 
-              {/* Row 5: Annualised Value + ABF Generated */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Product Vertical">
+                  <select name="product_vertical" defaultValue={row.product_vertical ?? ''} className={selectCls}>
+                    <option value="">— Select —</option>
+                    <option>CM</option><option>EB</option><option>CFA</option>
+                  </select>
+                </Field>
+                <div />
+              </div>
+
+              {/* Section: Financial */}
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">Financial</p>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Annualised Value (₹ Cr)">
                   <input name="annualized_value" type="number" step="0.0001" min="0" defaultValue={row.annualized_value ?? ''} className={inputCls} placeholder="0.0000" />
@@ -403,7 +434,7 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
 
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-              <div className="flex gap-3 pt-1">
+              <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setOpen(false)}
                   className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
                   Cancel

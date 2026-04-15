@@ -66,26 +66,31 @@ export async function moveToStage4(id: string, formData: FormData) {
 export async function updateStage4Opportunity(id: string, formData: FormData) {
   const supabase = getSupabase()
 
-  const poValue     = formData.get('po_value') as string
-  const annualValue = formData.get('annualized_value') as string
-  const commQty     = formData.get('commissioned_qty') as string
-  const contractYrs = formData.get('contract_period') as string
-  const oppId       = formData.get('opp_id') as string
-  const abfGen      = formData.get('abf_generated_total') as string
+  const g = (k: string) => (formData.get(k) as string) || null
 
   const { error } = await supabase
     .from('funnel_opportunities')
     .update({
-      opp_id:              oppId ? parseInt(oppId) : null,
-      po_date:             (formData.get('po_date') as string) || null,
-      po_value:            poValue ? parseFloat(poValue) : null,
-      contract_period:     contractYrs ? parseInt(contractYrs) : null,
-      commissioned_qty:    commQty ? parseInt(commQty) : null,
-      commissioned_status: formData.get('commissioned_status') as string || null,
-      product_vertical:    formData.get('product_vertical') as string || null,
-      annualized_value:    annualValue ? parseFloat(annualValue) : null,
-      abf_generated_total: abfGen ? parseFloat(abfGen) : null,
-      billing_cycle:       formData.get('billing_cycle') as string || null,
+      // Basic info
+      opp_id:              g('opp_id')       ? parseInt(g('opp_id')!)       : null,
+      nam_name:            g('nam_name'),
+      main_category:       g('main_category'),
+      product_name:        g('product_name'),
+      product_details:     g('product_details'),
+      quantity:            g('quantity')     ? parseInt(g('quantity')!)     : null,
+      remarks_current:     g('remarks_current'),
+      // PO details
+      po_date:             g('po_date'),
+      po_value:            g('po_value')     ? parseFloat(g('po_value')!)   : null,
+      contract_period:     g('contract_period') ? parseInt(g('contract_period')!) : null,
+      // Commissioning
+      commissioned_qty:    g('commissioned_qty') ? parseInt(g('commissioned_qty')!) : null,
+      commissioned_status: g('commissioned_status'),
+      billing_cycle:       g('billing_cycle'),
+      product_vertical:    g('product_vertical'),
+      // Financial
+      annualized_value:    g('annualized_value')    ? parseFloat(g('annualized_value')!)    : null,
+      abf_generated_total: g('abf_generated_total') ? parseFloat(g('abf_generated_total')!) : null,
     })
     .eq('id', id)
 
