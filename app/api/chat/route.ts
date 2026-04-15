@@ -42,12 +42,31 @@ function extractMonth(text: string): string | null {
   return null
 }
 
+// ── Extract ALL months mentioned in a question ────────────────────────────────
+function extractAllMonths(text: string): string[] {
+  const t = text.toUpperCase()
+  const results: string[] = []
+  const regex = /\b(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{4})\b/g
+  let m
+  while ((m = regex.exec(t)) !== null) {
+    results.push(`${m[2]}-${MONTH_MAP[m[1]]}`)
+  }
+  const isoRegex = /\b(\d{4})-(\d{2})\b/g
+  while ((m = isoRegex.exec(t)) !== null) {
+    results.push(`${m[1]}-${m[2]}`)
+  }
+  return Array.from(new Set(results))
+}
+
 // ── Intent detection ──────────────────────────────────────────────────────────
 function detectIntent(text: string) {
   const t = text.toUpperCase()
 
-  const namMentioned  = KNOWN_NAMS.find(n => t.includes(n)) ?? null
+  const namMentioned   = KNOWN_NAMS.find(n => t.includes(n)) ?? null
   const monthMentioned = extractMonth(text)
+  const allMonths      = extractAllMonths(text)
+  const wantsCompare   = /COMPAR|VS\b|VERSUS|DIFFERENCE|GROWTH|CHANGE|TREND/.test(t)
+  const wantsCurrent   = /CURRENT MONTH|THIS MONTH|LATEST MONTH/.test(t)
 
   const wantsStage4   = /STAGE\s*4|S4|CLOSED|BILLED|PO\b|PURCHASE ORDER/.test(t)
   const wantsStage1   = /STAGE\s*1|S1|PIPELINE|OPPORTUNITY|OPPORTUNITIES|PROSPECT/.test(t)
@@ -56,16 +75,60 @@ function detectIntent(text: string) {
   const wantsCustomer = /CUSTOMER(S)?/.test(t)
   const wantsSummary  = /SUMMARY|OVERVIEW|TOTAL|ALL NAM|ACROSS/.test(t)
 
-  return { namMentioned, monthMentioned, wantsStage4, wantsStage1, wantsSims, wantsBilling, wantsCustomer, wantsSummary }
+  return { namMentioned, monthMentioned, allMonths, wantsCompare, wantsCurrent, wantsStage4, wantsStage1, wantsSims, wantsBilling, wantsCustomer, wantsSummary }
+}
+
+// ── Fetch ABF summary for one month ──────────────────────────────────────────
+async function fetchAbfForMonth(sb: ReturnType<typeof getSupabase>, month: string) {
+  const { data } = await sb
+    .from('monthly_records')
+    .select('active_sims, abf_amount, customers(name, nam_name)')
+    .eq('month', month)
+  if (!data || data.length === 0) return null
+  const totalSims = data.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
+  const totalAbf  = data.reduce((s, r) => s + Number(r.abf_amount  ?? 0), 0)
+  return { month, totalSims, totalAbf, rows: data.length }
 }
 
 // ── Fetch relevant data from Supabase ─────────────────────────────────────────
-async function fetchContextData(userQuestion: string): Promise<string> {
+async function fetchContextData(userQuestion: string): Promise<{ context: string; latestMonth: string }> {
   const sb = getSupabase()
   const intent = detectIntent(userQuestion)
   const sections: string[] = []
 
+  // Always get the latest month first so we can resolve "current month"
+  const { data: latestRec } = await sb
+    .from('monthly_records')
+    .select('month')
+    .order('month', { ascending: false })
+    .limit(1)
+  const latestMonth = latestRec?.[0]?.month ?? '2026-04'
+
   try {
+    // ── Compare two months ───────────────────────────────────────────────────
+    if (intent.wantsCompare && (intent.allMonths.length > 0 || intent.wantsCurrent)) {
+      // Build list of months to compare
+      const monthsToFetch = new Set<string>(intent.allMonths)
+      if (intent.wantsCurrent || intent.allMonths.length < 2) monthsToFetch.add(latestMonth)
+
+      const results = await Promise.all(Array.from(monthsToFetch).map(m => fetchAbfForMonth(sb, m)))
+      const valid = results.filter(Boolean) as { month: string; totalSims: number; totalAbf: number; rows: number }[]
+
+      if (valid.length >= 1) {
+        valid.sort((a, b) => b.month.localeCompare(a.month))
+        sections.push('## ABF Comparison')
+        valid.forEach(v => {
+          const label = v.month === latestMonth ? `${v.month} (CURRENT/LATEST)` : v.month
+          sections.push(`${label}: ABF = ₹${v.totalAbf.toFixed(4)} Cr (₹${(v.totalAbf * 100).toFixed(2)} Lakhs) | Active SIMs = ${v.totalSims.toLocaleString('en-IN')} | Customers = ${v.rows}`)
+        })
+        if (valid.length === 2) {
+          const diff = valid[0].totalAbf - valid[1].totalAbf
+          const pct  = valid[1].totalAbf > 0 ? ((diff / valid[1].totalAbf) * 100).toFixed(1) : 'N/A'
+          sections.push(`Change: ${diff >= 0 ? '+' : ''}${diff.toFixed(4)} Cr (${diff >= 0 ? '+' : ''}${pct}%)`)
+        }
+      }
+    }
+
     // ── Stage 4 opportunities ────────────────────────────────────────────────
     // po_value & annualized_value are stored in LAKHS
     if (intent.wantsStage4 || (!intent.wantsStage1 && !intent.wantsSims && !intent.wantsBilling && intent.namMentioned)) {
@@ -144,7 +207,8 @@ async function fetchContextData(userQuestion: string): Promise<string> {
       const { data, error } = await q
 
       if (!error && data && data.length > 0) {
-        const targetMonth = intent.monthMentioned ?? data[0].month
+        // Resolve "current month" → latestMonth; fallback to first row's month
+        const targetMonth = intent.wantsCurrent ? latestMonth : (intent.monthMentioned ?? data[0].month)
         let rows = data.filter(r => r.month === targetMonth)
 
         if (intent.namMentioned) {
@@ -207,7 +271,6 @@ async function fetchContextData(userQuestion: string): Promise<string> {
       // po_value / after_discount in LAKHS; abf_amount in CRORES
       const totalS4   = (s4Res.data ?? []).reduce((s, r) => s + Number(r.po_value ?? 0), 0)
       const totalS1   = (s1Res.data ?? []).reduce((s, r) => s + Number(r.after_discount ?? 0), 0)
-      const latestMonth = simRes.data?.[0]?.month ?? 'unknown'
       const latestRows  = (simRes.data ?? []).filter(r => r.month === latestMonth)
       const totalSims   = latestRows.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
       const totalAbf    = latestRows.reduce((s, r) => s + Number(r.abf_amount  ?? 0), 0)
@@ -225,24 +288,36 @@ async function fetchContextData(userQuestion: string): Promise<string> {
     console.error('Data fetch error:', err)
   }
 
-  return sections.length > 0
-    ? `\n\n---\nLIVE DATA FROM DATABASE:\n${sections.join('\n')}\n---`
-    : ''
+  const context = sections.length > 0
+    ? `\n\n---\nLIVE DATA FROM DATABASE (latest available month = ${latestMonth}):\n${sections.join('\n')}\n---`
+    : `\n\n(No specific data found for this query. Latest available month in database: ${latestMonth})`
+
+  return { context, latestMonth }
 }
 
 // ── System prompt ─────────────────────────────────────────────────────────────
-const BASE_SYSTEM_PROMPT = `You are an intelligent assistant for the BSNL M2M Inventory Dashboard used by National Account Managers (NAMs) to track M2M SIM business.
+function buildSystemPrompt(latestMonth: string): string {
+  const now = new Date()
+  const dateStr = now.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' })
+  return `You are an intelligent assistant for the BSNL M2M Inventory Dashboard used by National Account Managers (NAMs) to track M2M SIM business.
+
+IMPORTANT DATE CONTEXT:
+- Today's date: ${dateStr} (Year ${now.getFullYear()})
+- Latest/current month in the database: ${latestMonth}
+- When the user says "current month" or "this month", they mean: ${latestMonth}
+- Historical data available: April 2025 through ${latestMonth}
 
 Key concepts:
 - M2M SIMs: Machine-to-Machine SIM cards used in IoT/connected devices
 - NAM: National Account Manager, each manages a set of enterprise customers
-- ABF: Annualised Billing Figure — yearly revenue from a customer
-- Stage 1: Pipeline opportunity (not yet closed)
-- Stage 4: Closed deal with Purchase Order (PO) and billing active
+- ABF: Annualised Billing Figure — monthly billing amount (stored in Crores in DB)
+- Stage 1: Pipeline opportunity (not yet closed), values in Lakhs
+- Stage 4: Closed deal with Purchase Order (PO) and billing active, values in Lakhs
 - Active SIMs: SIMs currently billed in monthly records
 - SIM Dump: Actual SIMs active in network (from BSNL's monthly data dump)
 
-When live data is provided above, use it to answer precisely. Quote actual numbers. Calculate totals if asked. Be concise — 3-5 sentences max unless a table is needed.`
+When live data is provided, use it to answer precisely with actual numbers. Be concise — 3-5 sentences max unless a table is needed.`
+}
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
@@ -265,8 +340,8 @@ export async function POST(req: NextRequest) {
 
   // Fetch live data based on the latest user question
   const lastUserMsg = [...messages].reverse().find(m => m.role === 'user')?.content ?? ''
-  const dataContext = await fetchContextData(lastUserMsg)
-  const systemPrompt = BASE_SYSTEM_PROMPT + dataContext
+  const { context: dataContext, latestMonth } = await fetchContextData(lastUserMsg)
+  const systemPrompt = buildSystemPrompt(latestMonth) + dataContext
 
   const upstream = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
     method: 'POST',
