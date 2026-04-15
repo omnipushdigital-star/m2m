@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 
-// Use Node.js runtime (not edge) for reliable fetch + env var access
 export const dynamic = 'force-dynamic'
 
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1'
@@ -33,9 +32,10 @@ You do NOT have direct access to live database records — you rely on what the 
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.NVIDIA_API_KEY
-
   if (!apiKey) {
-    return NextResponse.json({ error: 'NVIDIA_API_KEY not configured' }, { status: 500 })
+    return new Response(JSON.stringify({ error: 'NVIDIA_API_KEY not configured' }), {
+      status: 500, headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   let messages: { role: string; content: string }[]
@@ -43,53 +43,45 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     messages = body.messages ?? []
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
-  }
-
-  try {
-    const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          ...messages,
-        ],
-        temperature: 1.0,
-        top_p: 0.95,
-        max_tokens: 1024,
-        stream: false,
-      }),
+    return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+      status: 400, headers: { 'Content-Type': 'application/json' },
     })
-
-    const responseText = await response.text()
-
-    if (!response.ok) {
-      console.error('NVIDIA API error:', response.status, responseText)
-      return NextResponse.json(
-        { error: `AI service returned ${response.status}` },
-        { status: 502 }
-      )
-    }
-
-    let data: { choices?: { message?: { content?: string } }[] }
-    try {
-      data = JSON.parse(responseText)
-    } catch {
-      console.error('Failed to parse NVIDIA response:', responseText.slice(0, 200))
-      return NextResponse.json({ error: 'Invalid response from AI service' }, { status: 502 })
-    }
-
-    const content = data.choices?.[0]?.message?.content ?? 'No response received.'
-    return NextResponse.json({ content })
-
-  } catch (err) {
-    console.error('Chat route fetch error:', err)
-    return NextResponse.json({ error: 'Failed to reach AI service' }, { status: 500 })
   }
+
+  const upstream = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      'Accept': 'text/event-stream',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        ...messages,
+      ],
+      temperature: 0.7,
+      top_p: 0.95,
+      max_tokens: 512,
+      stream: true,
+    }),
+  })
+
+  if (!upstream.ok || !upstream.body) {
+    const errText = await upstream.text()
+    console.error('NVIDIA error:', upstream.status, errText)
+    return new Response(JSON.stringify({ error: `AI service error ${upstream.status}` }), {
+      status: 502, headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  // Pass the SSE stream straight through to the browser
+  return new Response(upstream.body, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
+    },
+  })
 }
