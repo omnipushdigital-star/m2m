@@ -51,13 +51,6 @@ function getFY(poDate: string | null): string | null {
   return `${fyStart}-${String(fyStart + 1).slice(2)}`
 }
 
-function monthlyAbf(r: Opp): number | null {
-  if (!r.annualized_value) return null
-  const frac = r.quantity && r.commissioned_qty
-    ? Math.min(r.commissioned_qty / r.quantity, 1)
-    : 1
-  return (r.annualized_value / 12) * frac
-}
 
 function fmt(v: number | null | undefined) {
   if (v == null || v === 0) return ''
@@ -90,27 +83,43 @@ export function LtbReportClient({
   monthly: Monthly[]
   isAdmin?: boolean
 }) {
-  const [activeTab, setActiveTab]   = useState<'stage4' | 'stage1' | 'billing'>('stage4')
-  const [fyFilter,  setFyFilter]    = useState<string>('all')
+  const [activeTab,    setActiveTab]    = useState<'stage4' | 'stage1' | 'billing'>('stage4')
+  const [fyFilter,     setFyFilter]     = useState<string>('all')
+  const [namFilter,    setNamFilter]    = useState<string>('all')
+  const [catFilter,    setCatFilter]    = useState<string>('all')
+  const [vertFilter,   setVertFilter]   = useState<string>('all')
+  const [searchTerm,   setSearchTerm]   = useState<string>('')
 
   // All FYs present in stage 4 data (from po_date)
   const availableFYs = useMemo(() => {
     const fys = new Set<string>()
     for (const o of opps) {
-      if (o.funnel_stage === 4) {
-        const fy = getFY(o.po_date)
-        if (fy) fys.add(fy)
-      }
+      if (o.funnel_stage === 4) { const fy = getFY(o.po_date); if (fy) fys.add(fy) }
     }
     return Array.from(fys).sort()
   }, [opps])
 
+  // Unique filter options
+  const namOptions  = useMemo(() => Array.from(new Set(opps.map(o => o.nam_name).filter(Boolean))).sort() as string[], [opps])
+  const catOptions  = useMemo(() => Array.from(new Set(opps.map(o => o.main_category).filter(Boolean))).sort() as string[], [opps])
+  const vertOptions = useMemo(() => Array.from(new Set(opps.filter(o => o.funnel_stage === 4).map(o => o.product_vertical).filter(Boolean))).sort() as string[], [opps])
+
+  // Apply all filters
+  function applyFilters(rows: Opp[]) {
+    return rows.filter(r => {
+      if (namFilter  !== 'all' && r.nam_name       !== namFilter)  return false
+      if (catFilter  !== 'all' && r.main_category  !== catFilter)  return false
+      if (vertFilter !== 'all' && r.product_vertical !== vertFilter) return false
+      if (searchTerm && !r.customer_name.toLowerCase().includes(searchTerm.toLowerCase())) return false
+      return true
+    })
+  }
+
   // Split and filter
-  const allStage4  = opps.filter(o => o.funnel_stage === 4)
-  const stage4     = fyFilter === 'all'
-    ? allStage4
-    : allStage4.filter(o => getFY(o.po_date) === fyFilter)
-  const stage1     = opps.filter(o => o.funnel_stage === 1)
+  const allStage4 = opps.filter(o => o.funnel_stage === 4)
+  const stage4FY  = fyFilter === 'all' ? allStage4 : allStage4.filter(o => getFY(o.po_date) === fyFilter)
+  const stage4    = applyFilters(stage4FY)
+  const stage1    = applyFilters(opps.filter(o => o.funnel_stage === 1))
 
   // Dynamic month columns from actual billing data
   const billingMonths = useMemo(() => {
@@ -135,9 +144,9 @@ export function LtbReportClient({
   }, [monthly])
 
   // ── Totals ──
-  const totalPO      = stage4.reduce((s, r) => s + (r.po_value ?? 0), 0)
-  const totalMonthly = stage4.reduce((s, r) => s + (monthlyAbf(r) ?? 0), 0)
-  const totalAbfGen  = stage4.reduce((s, r) => s + (r.abf_generated_total ?? 0), 0)
+  const totalPO        = stage4.reduce((s, r) => s + (r.po_value ?? 0), 0)
+  const totalAnnualised = stage4.reduce((s, r) => s + (r.annualized_value ?? 0), 0)
+  const totalAbfGen    = stage4.reduce((s, r) => s + (r.abf_generated_total ?? 0), 0)
 
   // ── Export ──
   function exportExcel() {
@@ -148,14 +157,14 @@ export function LtbReportClient({
     const s4H = [
       'Opp ID','Customer','Category','NAM','Product','Vertical','Billing Cycle',
       'Qty','PO Value (₹ Cr)','PO Date','FY','Contract (Y)',
-      'Comm. Qty','Monthly ABF (₹ Cr)','ABF Generated (₹ Cr)','Status',
+      'Comm. Qty','Annualised Value (₹ Cr)','ABF Generated (₹ Cr)','Status',
     ]
     const s4R = stage4.map(r => [
       r.opp_id, r.customer_name, r.main_category, r.nam_name,
       r.product_name, r.product_vertical ?? '', r.billing_cycle ?? '',
       r.quantity, r.po_value, r.po_date, getFY(r.po_date) ?? '',
       r.contract_period, r.commissioned_qty,
-      monthlyAbf(r) != null ? parseFloat((monthlyAbf(r)!).toFixed(3)) : '',
+      r.annualized_value != null ? parseFloat(r.annualized_value.toFixed(3)) : '',
       r.abf_generated_total ?? '', r.commissioned_status ?? '',
     ])
     const ws1 = XLSX.utils.aoa_to_sheet([s4H, ...s4R])
@@ -216,28 +225,66 @@ export function LtbReportClient({
           </h1>
           <p className="text-sm text-slate-500 mt-1">GGN Unit · EB Platinum · All Active POs</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-slate-600">Financial Year:</label>
-            <select
-              value={fyFilter}
-              onChange={e => setFyFilter(e.target.value)}
-              className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
-            >
-              <option value="all">All FYs</option>
-              {availableFYs.map(fy => (
-                <option key={fy} value={fy}>FY {fy}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-bold shadow-sm transition-opacity hover:opacity-90"
-            style={{ background: '#2e7d32' }}
-          >
-            ⬇ Download Excel
-          </button>
+        <button
+          onClick={exportExcel}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-bold shadow-sm transition-opacity hover:opacity-90"
+          style={{ background: '#2e7d32' }}
+        >
+          ⬇ Download Excel
+        </button>
+      </div>
+
+      {/* ── Filter bar ── */}
+      <div className="bg-white rounded-xl border border-slate-200 px-4 py-3 flex flex-wrap gap-3 items-end">
+        <div className="flex flex-col gap-1 min-w-[140px]">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Customer Search</label>
+          <input
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Type customer name…"
+            className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300 w-48"
+          />
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">NAM</label>
+          <select value={namFilter} onChange={e => setNamFilter(e.target.value)}
+            className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="all">All NAMs</option>
+            {namOptions.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</label>
+          <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
+            className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="all">All Categories</option>
+            {catOptions.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Vertical (S4)</label>
+          <select value={vertFilter} onChange={e => setVertFilter(e.target.value)}
+            className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="all">All Verticals</option>
+            {vertOptions.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Financial Year</label>
+          <select value={fyFilter} onChange={e => setFyFilter(e.target.value)}
+            className="text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+            <option value="all">All FYs</option>
+            {availableFYs.map(fy => <option key={fy} value={fy}>FY {fy}</option>)}
+          </select>
+        </div>
+        {(searchTerm || namFilter !== 'all' || catFilter !== 'all' || vertFilter !== 'all' || fyFilter !== 'all') && (
+          <button
+            onClick={() => { setSearchTerm(''); setNamFilter('all'); setCatFilter('all'); setVertFilter('all'); setFyFilter('all') }}
+            className="text-xs text-slate-500 hover:text-red-500 underline mt-4"
+          >
+            Clear all filters
+          </button>
+        )}
       </div>
 
       {/* ── KPI cards ── */}
@@ -247,8 +294,8 @@ export function LtbReportClient({
             value: String(stage4.length),               color: '#2e7d32' },
           { label: 'Total PO Value (₹ Cr)',
             value: totalPO.toFixed(2),                  color: '#2e7d32' },
-          { label: 'Monthly ABF (₹ Cr)',
-            value: totalMonthly.toFixed(3),              color: '#0d47a1' },
+          { label: 'Annualised Value (₹ Cr)',
+            value: totalAnnualised.toFixed(3),            color: '#0d47a1' },
           { label: 'ABF Generated (₹ Cr)',
             value: totalAbfGen.toFixed(3),               color: '#6a1b9a' },
         ].map(c => (
@@ -288,7 +335,7 @@ export function LtbReportClient({
           <table className="w-full text-sm whitespace-nowrap">
             <thead className="bg-slate-50 border-b text-xs uppercase tracking-wide">
               <tr>
-                {['Opp ID','Customer','Category','NAM','Product','Vert.','Qty','PO Value (₹Cr)','PO Date','FY','Contract','Comm. Qty','Monthly ABF (₹Cr)','ABF Gen (₹Cr)','Status'].map(h => (
+                {['Opp ID','Customer','Category','NAM','Product','Vert.','Qty','PO Value (₹Cr)','PO Date','FY','Contract','Comm. Qty','Annual Value (₹Cr)','ABF Gen (₹Cr)','Status'].map(h => (
                   <th key={h} className="px-3 py-2.5 text-left font-semibold text-slate-600">{h}</th>
                 ))}
                 {isAdmin && <th className="px-3 py-2.5"></th>}
@@ -298,7 +345,6 @@ export function LtbReportClient({
               {stage4.length === 0 ? (
                 <tr><td colSpan={15} className="px-4 py-8 text-center text-slate-400">No records for the selected FY.</td></tr>
               ) : stage4.map((r, i) => {
-                const mAbf = monthlyAbf(r)
                 const vc   = vertColors[r.product_vertical ?? '']
                 const fy   = getFY(r.po_date)
                 return (
@@ -335,7 +381,7 @@ export function LtbReportClient({
                     <td className="px-3 py-2 text-center">{r.contract_period ? `${r.contract_period}Y` : '—'}</td>
                     <td className="px-3 py-2 text-right">{fmt(r.commissioned_qty)}</td>
                     <td className="px-3 py-2 text-right font-bold" style={{ color: '#0d47a1' }}>
-                      {mAbf != null ? mAbf.toFixed(3) : '—'}
+                      {r.annualized_value != null ? r.annualized_value.toFixed(3) : '—'}
                     </td>
                     <td className="px-3 py-2 text-right font-bold" style={{ color: '#6a1b9a' }}>
                       {r.abf_generated_total != null ? r.abf_generated_total.toFixed(3) : '—'}
@@ -373,7 +419,7 @@ export function LtbReportClient({
                     {stage4.reduce((s, r) => s + (r.commissioned_qty ?? 0), 0).toLocaleString('en-IN')}
                   </td>
                   <td className="px-3 py-2 text-right" style={{ color: '#0d47a1' }}>
-                    {totalMonthly.toFixed(3)}
+                    {totalAnnualised.toFixed(3)}
                   </td>
                   <td className="px-3 py-2 text-right" style={{ color: '#6a1b9a' }}>
                     {totalAbfGen.toFixed(3)}
