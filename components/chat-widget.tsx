@@ -168,7 +168,7 @@ export function ChatWidget() {
               <div className="space-y-3">
                 <div className="flex gap-2">
                   <div className="w-6 h-6 rounded-full bg-[#1565c0]/10 flex items-center justify-center shrink-0 mt-0.5">
-                    <Bot className="w-3.5 h-3.5 text-[#1565c0]" />
+                    <Image src="/bsnl-logo.png" alt="BSNL" width={14} height={14} className="object-contain" />
                   </div>
                   <div className="bg-slate-50 rounded-2xl rounded-tl-sm px-3 py-2.5 text-sm text-slate-700 max-w-[260px]">
                     Hi! I&apos;m your M2M dashboard assistant. Ask me anything about SIMs, customers, plans, or the funnel.
@@ -193,7 +193,7 @@ export function ChatWidget() {
                 )}>
                   {m.role === 'user'
                     ? <User className="w-3.5 h-3.5 text-white" />
-                    : <Bot className="w-3.5 h-3.5 text-[#1565c0]" />
+                    : <Image src="/bsnl-logo.png" alt="BSNL" width={14} height={14} className="object-contain" />
                   }
                 </div>
                 <div className={cn(
