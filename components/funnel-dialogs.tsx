@@ -337,20 +337,27 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
 
             <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
 
-              {/* Section: Basic Info */}
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Basic Info</p>
-              <div className="grid grid-cols-3 gap-4">
+              {/* ── Basic Info ── */}
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">Basic Info</p>
+
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Opp ID">
                   <input name="opp_id" type="number" defaultValue={row.opp_id ?? ''} className={inputCls} placeholder="e.g. 580718" />
                 </Field>
                 <Field label="NAM">
                   <input name="nam_name" defaultValue={row.nam_name ?? ''} className={inputCls} placeholder="NAM name" />
                 </Field>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Category">
                   <select name="main_category" defaultValue={row.main_category ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
                     <option>GOVT</option><option>PSU</option><option>PRIVATE</option>
                   </select>
+                </Field>
+                <Field label="Total Contracted Qty">
+                  <input name="quantity" type="number" min="0" defaultValue={row.quantity ?? ''} className={inputCls} placeholder="0" />
                 </Field>
               </div>
 
@@ -363,35 +370,41 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Total Contracted Qty">
-                  <input name="quantity" type="number" min="0" defaultValue={row.quantity ?? ''} className={inputCls} placeholder="0" />
-                </Field>
-                <Field label="Remarks">
-                  <input name="remarks_current" defaultValue={row.remarks_current ?? ''} className={inputCls} placeholder="Current status remarks" />
-                </Field>
-              </div>
+              <Field label="Remarks">
+                <input name="remarks_current" defaultValue={row.remarks_current ?? ''} className={inputCls} placeholder="Current status remarks" />
+              </Field>
 
-              {/* Section: PO Details */}
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">PO Details</p>
-              <div className="grid grid-cols-3 gap-4">
+              {/* ── PO Details ── */}
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 pt-1">PO Details</p>
+
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="PO Date">
                   <input name="po_date" type="date" defaultValue={row.po_date ?? ''} className={inputCls} />
                 </Field>
                 <Field label="PO Value (₹ Cr)" required>
                   <input name="po_value" type="number" step="0.001" min="0" defaultValue={row.po_value ?? ''} className={inputCls} placeholder="0.000" />
                 </Field>
-                <Field label="Contract Period">
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Contract Period (Years)">
                   <select name="contract_period" defaultValue={row.contract_period ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
                     {[1,2,3,5].map(n => <option key={n} value={n}>{n} Year{n > 1 ? 's' : ''}</option>)}
                   </select>
                 </Field>
+                <Field label="Billing Cycle">
+                  <select name="billing_cycle" defaultValue={row.billing_cycle ?? ''} className={selectCls}>
+                    <option value="">— Select —</option>
+                    <option>Monthly</option><option>Quarterly</option><option>Annually</option>
+                  </select>
+                </Field>
               </div>
 
-              {/* Section: Commissioning */}
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">Commissioning</p>
-              <div className="grid grid-cols-3 gap-4">
+              {/* ── Commissioning ── */}
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 pt-1">Commissioning</p>
+
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Commissioned Qty">
                   <input name="commissioned_qty" type="number" min="0" defaultValue={row.commissioned_qty ?? ''} className={inputCls} placeholder="0" />
                 </Field>
@@ -399,12 +412,6 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                   <select name="commissioned_status" defaultValue={row.commissioned_status ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
                     <option>Full</option><option>Partial</option>
-                  </select>
-                </Field>
-                <Field label="Billing Cycle">
-                  <select name="billing_cycle" defaultValue={row.billing_cycle ?? ''} className={selectCls}>
-                    <option value="">— Select —</option>
-                    <option>Monthly</option><option>Quarterly</option><option>Annually</option>
                   </select>
                 </Field>
               </div>
@@ -419,8 +426,9 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                 <div />
               </div>
 
-              {/* Section: Financial */}
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest pt-1">Financial</p>
+              {/* ── Financial ── */}
+              <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1 pt-1">Financial</p>
+
               <div className="grid grid-cols-2 gap-4">
                 <Field label="Annualised Value (₹ Cr)">
                   <input name="annualized_value" type="number" step="0.0001" min="0" defaultValue={row.annualized_value ?? ''} className={inputCls} placeholder="0.0000" />
