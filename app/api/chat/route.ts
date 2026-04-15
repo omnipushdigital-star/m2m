@@ -107,7 +107,7 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
     // ── Active SIMs / billing ─────────────────────────────────────────────────
     if (intent.wantsSims || intent.wantsBilling) {
-      let q = sb
+      const q = sb
         .from('monthly_records')
         .select('customer_id, active_sims, abf_amount, month, customers(name, nam_name)')
         .order('month', { ascending: false })
