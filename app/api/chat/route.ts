@@ -23,20 +23,40 @@ const KNOWN_NAMS = [
   'NAVEEN SAINI', 'NAVEEN',
 ]
 
+// ── Month name → YYYY-MM ──────────────────────────────────────────────────────
+const MONTH_MAP: Record<string, string> = {
+  JANUARY: '01', FEBRUARY: '02', MARCH: '03', APRIL: '04',
+  MAY: '05', JUNE: '06', JULY: '07', AUGUST: '08',
+  SEPTEMBER: '09', OCTOBER: '10', NOVEMBER: '11', DECEMBER: '12',
+  JAN: '01', FEB: '02', MAR: '03', APR: '04',
+  JUN: '06', JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
+}
+
+function extractMonth(text: string): string | null {
+  const t = text.toUpperCase()
+  // Match "April 2026" or "Apr 2026" or "2026-04"
+  const named = t.match(/\b(JANUARY|FEBRUARY|MARCH|APRIL|MAY|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER|JAN|FEB|MAR|APR|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+(\d{4})\b/)
+  if (named) return `${named[2]}-${MONTH_MAP[named[1]]}`
+  const iso = t.match(/\b(\d{4})-(\d{2})\b/)
+  if (iso) return `${iso[1]}-${iso[2]}`
+  return null
+}
+
 // ── Intent detection ──────────────────────────────────────────────────────────
 function detectIntent(text: string) {
   const t = text.toUpperCase()
 
-  const namMentioned = KNOWN_NAMS.find(n => t.includes(n)) ?? null
+  const namMentioned  = KNOWN_NAMS.find(n => t.includes(n)) ?? null
+  const monthMentioned = extractMonth(text)
 
-  const wantsStage4  = /STAGE\s*4|S4|CLOSED|BILLED|PO\b|PURCHASE ORDER/.test(t)
-  const wantsStage1  = /STAGE\s*1|S1|PIPELINE|OPPORTUNITY|OPPORTUNITIES|PROSPECT/.test(t)
-  const wantsSims    = /\bSIM(S)?\b|INVENTORY|ACTIVE SIM|DUMP/.test(t)
-  const wantsBilling = /\bABF\b|BILLING|REVENUE|AMOUNT|COLLECTION/.test(t)
+  const wantsStage4   = /STAGE\s*4|S4|CLOSED|BILLED|PO\b|PURCHASE ORDER/.test(t)
+  const wantsStage1   = /STAGE\s*1|S1|PIPELINE|OPPORTUNITY|OPPORTUNITIES|PROSPECT/.test(t)
+  const wantsSims     = /\bSIM(S)?\b|INVENTORY|ACTIVE SIM|DUMP/.test(t)
+  const wantsBilling  = /\bABF\b|BILLING|REVENUE|AMOUNT|COLLECTION/.test(t)
   const wantsCustomer = /CUSTOMER(S)?/.test(t)
   const wantsSummary  = /SUMMARY|OVERVIEW|TOTAL|ALL NAM|ACROSS/.test(t)
 
-  return { namMentioned, wantsStage4, wantsStage1, wantsSims, wantsBilling, wantsCustomer, wantsSummary }
+  return { namMentioned, monthMentioned, wantsStage4, wantsStage1, wantsSims, wantsBilling, wantsCustomer, wantsSummary }
 }
 
 // ── Fetch relevant data from Supabase ─────────────────────────────────────────
@@ -61,8 +81,8 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
       const { data, error } = await q
       if (!error && data && data.length > 0) {
-        const total = data.reduce((s, r) => s + (r.po_value ?? 0), 0)
-        const annTotal = data.reduce((s, r) => s + (r.annualised_value ?? 0), 0)
+        const total = data.reduce((s, r) => s + Number(r.po_value ?? 0), 0)
+        const annTotal = data.reduce((s, r) => s + Number(r.annualised_value ?? 0), 0)
         sections.push(
           `## Stage 4 Opportunities${intent.namMentioned ? ` (NAM: ${intent.namMentioned})` : ''}`,
           `Total PO Value: ₹${(total / 100000).toFixed(2)} Lakhs | Annualised: ₹${(annTotal / 100000).toFixed(2)} Lakhs | Count: ${data.length}`,
@@ -91,7 +111,7 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
       const { data, error } = await q
       if (!error && data && data.length > 0) {
-        const total = data.reduce((s, r) => s + (r.estimated_value ?? 0), 0)
+        const total = data.reduce((s, r) => s + Number(r.estimated_value ?? 0), 0)
         sections.push(
           `## Stage 1 Pipeline${intent.namMentioned ? ` (NAM: ${intent.namMentioned})` : ''}`,
           `Total Pipeline Value: ₹${(total / 100000).toFixed(2)} Lakhs | Count: ${data.length}`,
@@ -107,18 +127,22 @@ async function fetchContextData(userQuestion: string): Promise<string> {
 
     // ── Active SIMs / billing ─────────────────────────────────────────────────
     if (intent.wantsSims || intent.wantsBilling) {
-      const q = sb
+      let q = sb
         .from('monthly_records')
         .select('customer_id, active_sims, abf_amount, month, customers(name, nam_name)')
         .order('month', { ascending: false })
-        .limit(intent.namMentioned ? 50 : 15)
+        .limit(300)
+
+      // Filter by specific month if mentioned in question
+      if (intent.monthMentioned) {
+        q = q.eq('month', intent.monthMentioned)
+      }
 
       const { data, error } = await q
 
       if (!error && data && data.length > 0) {
-        // Get latest month only
-        const latestMonth = data[0].month
-        let rows = data.filter(r => r.month === latestMonth)
+        const targetMonth = intent.monthMentioned ?? data[0].month
+        let rows = data.filter(r => r.month === targetMonth)
 
         if (intent.namMentioned) {
           rows = rows.filter(r => {
@@ -127,18 +151,21 @@ async function fetchContextData(userQuestion: string): Promise<string> {
           })
         }
 
-        const totalSims = rows.reduce((s, r) => s + (r.active_sims ?? 0), 0)
-        const totalAbf  = rows.reduce((s, r) => s + (r.abf_amount ?? 0), 0)
+        // Cast to Number — Supabase can return numeric fields as strings
+        const totalSims = rows.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
+        const totalAbf  = rows.reduce((s, r) => s + Number(r.abf_amount  ?? 0), 0)
 
         sections.push(
-          `## Active SIMs & Billing (Month: ${latestMonth})${intent.namMentioned ? ` — NAM: ${intent.namMentioned}` : ''}`,
-          `Total Active SIMs: ${totalSims.toLocaleString('en-IN')} | Total ABF: ₹${(totalAbf / 100000).toFixed(2)} Lakhs`,
+          `## Active SIMs & Billing (Month: ${targetMonth})${intent.namMentioned ? ` — NAM: ${intent.namMentioned}` : ''}`,
+          `Total Active SIMs: ${totalSims.toLocaleString('en-IN')} | Total ABF: ₹${(totalAbf / 100000).toFixed(2)} Lakhs | Customers: ${rows.length}`,
           'Customer | NAM | Active SIMs | ABF (₹)',
-          ...rows.slice(0, 20).map(r => {
+          ...rows.map(r => {
             const c = r.customers as { name?: string; nam_name?: string } | null
-            return `${c?.name ?? '—'} | ${c?.nam_name ?? '—'} | ${r.active_sims?.toLocaleString('en-IN') ?? '—'} | ${r.abf_amount?.toLocaleString('en-IN') ?? '—'}`
+            return `${c?.name ?? '—'} | ${c?.nam_name ?? '—'} | ${Number(r.active_sims ?? 0).toLocaleString('en-IN')} | ${Number(r.abf_amount ?? 0).toLocaleString('en-IN')}`
           })
         )
+      } else if (!error) {
+        sections.push(`## Billing Data: No records found for ${intent.monthMentioned ?? 'latest month'}.`)
       }
     }
 
@@ -174,12 +201,12 @@ async function fetchContextData(userQuestion: string): Promise<string> {
         sb.from('monthly_records').select('active_sims, abf_amount, month').order('month', { ascending: false }).limit(200),
       ])
 
-      const totalS4 = (s4Res.data ?? []).reduce((s, r) => s + (r.po_value ?? 0), 0)
-      const totalS1 = (s1Res.data ?? []).reduce((s, r) => s + (r.estimated_value ?? 0), 0)
+      const totalS4 = (s4Res.data ?? []).reduce((s, r) => s + Number(r.po_value ?? 0), 0)
+      const totalS1 = (s1Res.data ?? []).reduce((s, r) => s + Number(r.estimated_value ?? 0), 0)
       const latestMonth = simRes.data?.[0]?.month ?? 'unknown'
       const latestRows  = (simRes.data ?? []).filter(r => r.month === latestMonth)
-      const totalSims   = latestRows.reduce((s, r) => s + (r.active_sims ?? 0), 0)
-      const totalAbf    = latestRows.reduce((s, r) => s + (r.abf_amount ?? 0), 0)
+      const totalSims   = latestRows.reduce((s, r) => s + Number(r.active_sims ?? 0), 0)
+      const totalAbf    = latestRows.reduce((s, r) => s + Number(r.abf_amount  ?? 0), 0)
 
       sections.push(
         '## Dashboard Summary',
