@@ -319,42 +319,48 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-slate-100">
-              <div className="flex items-center justify-between">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
                 <h2 className="text-lg font-bold text-slate-800">Edit Stage 4 — PO Details</h2>
-                <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 text-xl leading-none">×</button>
+                <p className="text-sm text-[#1565c0] font-medium mt-0.5">{row.customer_name}</p>
               </div>
-              <p className="text-sm text-slate-500 mt-0.5 truncate">{row.customer_name}</p>
+              <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">×</button>
             </div>
 
-            <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <form ref={formRef} onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
+
+              {/* Row 1: Opp ID + PO Date */}
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Opp ID">
-                  <input name="opp_id" type="number" defaultValue={row.opp_id ?? ''} className={inputCls} placeholder="e.g. 1234" />
+                  <input name="opp_id" type="number" defaultValue={row.opp_id ?? ''} className={inputCls} placeholder="e.g. 580718" />
                 </Field>
                 <Field label="PO Date">
                   <input name="po_date" type="date" defaultValue={row.po_date ?? ''} className={inputCls} />
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="PO Value (₹ Cr)">
-                  <input name="po_value" type="number" step="0.001" min="0" defaultValue={row.po_value ?? ''} className={inputCls} />
+              {/* Row 2: PO Value + Contract Period */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="PO Value (₹ Cr)" required>
+                  <input name="po_value" type="number" step="0.001" min="0" defaultValue={row.po_value ?? ''} className={inputCls} placeholder="0.000" />
                 </Field>
-                <Field label="Contract Period (years)">
+                <Field label="Contract Period (Years)">
                   <select name="contract_period" defaultValue={row.contract_period ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
-                    {[1,2,3,5].map(n => <option key={n} value={n}>{n}</option>)}
+                    {[1,2,3,5].map(n => <option key={n} value={n}>{n} Year{n > 1 ? 's' : ''}</option>)}
                   </select>
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <Field label={`Commissioned Qty${row.quantity ? ` (of ${row.quantity.toLocaleString('en-IN')})` : ''}`}>
-                  <input name="commissioned_qty" type="number" min="0" defaultValue={row.commissioned_qty ?? ''} className={inputCls} />
+              {/* Row 3: Commissioned Qty + Status — full labels, no overflow */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label={`Commissioned Qty${row.quantity ? ` (Total: ${row.quantity.toLocaleString('en-IN')})` : ''}`}>
+                  <input name="commissioned_qty" type="number" min="0" defaultValue={row.commissioned_qty ?? ''} className={inputCls} placeholder="0" />
                 </Field>
-                <Field label="Status">
+                <Field label="Commissioned Status">
                   <select name="commissioned_status" defaultValue={row.commissioned_status ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
                     <option>Full</option>
@@ -363,7 +369,8 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 4: Vertical + Billing Cycle */}
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Product Vertical">
                   <select name="product_vertical" defaultValue={row.product_vertical ?? ''} className={selectCls}>
                     <option value="">— Select —</option>
@@ -382,26 +389,27 @@ export function EditStage4Dialog({ row }: { row: Stage4Row }) {
                 </Field>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 5: Annualised Value + ABF Generated */}
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="Annualised Value (₹ Cr)">
-                  <input name="annualized_value" type="number" step="0.0001" min="0" defaultValue={row.annualized_value ?? ''} className={inputCls} />
-                  <p className="text-xs text-slate-400 mt-0.5">Monthly ABF = this ÷ 12</p>
+                  <input name="annualized_value" type="number" step="0.0001" min="0" defaultValue={row.annualized_value ?? ''} className={inputCls} placeholder="0.0000" />
+                  <p className="text-xs text-slate-400 mt-1">= PO Value ÷ Contract Period</p>
                 </Field>
                 <Field label="ABF Generated (₹ Cr)">
-                  <input name="abf_generated_total" type="number" step="0.0001" min="0" defaultValue={row.abf_generated_total ?? ''} className={inputCls} />
-                  <p className="text-xs text-slate-400 mt-0.5">Cumulative ABF so far</p>
+                  <input name="abf_generated_total" type="number" step="0.0001" min="0" defaultValue={row.abf_generated_total ?? ''} className={inputCls} placeholder="0.0000" />
+                  <p className="text-xs text-slate-400 mt-1">Cumulative ABF collected so far</p>
                 </Field>
               </div>
 
-              {error && <p className="text-sm text-red-600 bg-red-50 rounded px-3 py-2">{error}</p>}
+              {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
-              <div className="flex gap-2 pt-2">
+              <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setOpen(false)}
-                  className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                  className="flex-1 px-4 py-2.5 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
                   Cancel
                 </button>
                 <button type="submit" disabled={pending}
-                  className="flex-1 px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-60"
+                  className="flex-1 px-4 py-2.5 rounded-lg text-white text-sm font-semibold disabled:opacity-60"
                   style={{ background: '#1565c0' }}>
                   {pending ? 'Saving…' : 'Save Changes'}
                 </button>
